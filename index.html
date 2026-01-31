@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>wakuwaku G1 2026 - Dashboard</title>
+  <title>wakuwaku G1 2026</title>
 
   <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
@@ -14,7 +14,8 @@
       --card:#111a33;
       --text:#e9eefc;
       --muted:#9fb0dd;
-      --border:rgba(255,255,255,.08);
+      --border:rgba(255,255,255,.10);
+      --accent:#7aa2ff;
       --danger:#ff6b6b;
     }
     *{box-sizing:border-box}
@@ -25,17 +26,34 @@
       color:var(--text);
     }
     header{
-      padding:18px 16px 10px;
+      padding:16px 14px 10px;
       max-width:1200px; margin:0 auto;
-      display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+      display:flex; flex-direction:column; gap:10px;
     }
-    h1{margin:0; font-size:22px; letter-spacing:.2px}
-    .sub{color:var(--muted); font-size:12px; margin-top:6px}
-    .wrap{max-width:1200px; margin:0 auto; padding:12px 12px 28px;}
-    .grid{
-      display:grid; gap:12px;
-      grid-template-columns: repeat(12, 1fr);
+    h1{margin:0; font-size:20px; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:12px}
+
+    .tabs{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
     }
+    .tabbtn{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      padding:8px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-size:13px;
+      white-space:nowrap;
+    }
+    .tabbtn.active{
+      border-color: rgba(122,162,255,.6);
+      background: rgba(122,162,255,.12);
+    }
+
+    .wrap{max-width:1200px; margin:0 auto; padding:10px 12px 26px;}
     .card{
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
       border:1px solid var(--border);
@@ -44,270 +62,476 @@
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
       overflow:hidden;
     }
-    .card h2{
-      margin:0 0 8px 0;
-      font-size:13px;
-      font-weight:700;
-      color:var(--muted);
-      letter-spacing:.3px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:8px;
-    }
-    .chart{width:100%; height:280px;}
-    .chartTall{width:100%; height:320px;}
-    .c1{grid-column: span 4;}
-    .c2{grid-column: span 4;}
-    .c3{grid-column: span 4;}
-    .c4{grid-column: span 4;}
-    .c5{grid-column: span 4;}
-    .c6{grid-column: span 4;}
 
-    @media (max-width: 900px){
-      header{flex-direction:column; align-items:flex-start;}
-      .c1,.c2,.c3,.c4,.c5,.c6{grid-column: span 12;}
-      .chart{height:260px;}
-      .chartTall{height:300px;}
+    /* Input layout */
+    .form{
+      display:grid;
+      gap:10px;
+      grid-template-columns: 1fr 1fr;
     }
-    .toolbar{
-      display:flex; gap:8px; align-items:center; flex-wrap:wrap;
-      color:var(--muted); font-size:12px;
+    .form .full{grid-column:1 / -1;}
+    label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px;}
+    input, select{
+      width:100%;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.20);
+      color:var(--text);
+      outline:none;
+      font-size:16px; /* iPhoneの拡大対策 */
+    }
+    input::placeholder{color:rgba(233,238,252,.45);}
+    .row{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .btn{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-size:13px;
+    }
+    .btn.primary{
+      border-color: rgba(122,162,255,.6);
+      background: rgba(122,162,255,.18);
     }
     .badge{
       border:1px solid var(--border);
       padding:6px 10px;
       border-radius:999px;
       background:rgba(255,255,255,.03);
-    }
-    .badge.danger{
-      border-color: rgba(255,107,107,.5);
-      color: var(--danger);
-    }
-    .hint{
-      font-size:11px;
-      color:rgba(233,238,252,.65);
-      margin-top:6px;
-    }
-    .btn{
-      border:1px solid var(--border);
-      background: rgba(255,255,255,.03);
-      color: var(--text);
-      padding:6px 10px;
-      border-radius:10px;
-      cursor:pointer;
+      color: var(--muted);
       font-size:12px;
     }
-    .btn:hover{background: rgba(255,255,255,.06);}
+    .badge.danger{color:var(--danger); border-color: rgba(255,107,107,.5);}
+
+    /* Dashboard layout */
+    .grid{
+      display:grid; gap:12px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    .c1{grid-column: span 4;}
+    .c2{grid-column: span 4;}
+    .c3{grid-column: span 4;}
+    .c4{grid-column: span 4;}
+    .c5{grid-column: span 4;}
+    .c6{grid-column: span 4;}
+    .chart{width:100%; height:280px;}
+    .chartTall{width:100%; height:320px;}
+
+    @media (max-width: 900px){
+      .form{grid-template-columns: 1fr;}
+      .c1,.c2,.c3,.c4,.c5,.c6{grid-column: span 12;}
+      .chart{height:260px;}
+      .chartTall{height:300px;}
+    }
+
+    .hidden{display:none !important;}
+    .hint{font-size:12px; color:rgba(233,238,252,.65);}
+    .ok{color:#9be39b;}
   </style>
 </head>
+
 <body>
 <header>
   <div>
-    <h1>wakuwaku G1 2026 - Dashboard</h1>
-    <div class="sub">Sheets(WebData) → GAS(JSON) → ECharts（自動更新）</div>
+    <h1>wakuwaku G1 2026</h1>
+    <div class="sub">入力 → Entriesへ保存 / 集計 → WebData → ECharts</div>
   </div>
-  <div class="toolbar">
-    <span class="badge" id="updated">updated: -</span>
-    <button class="btn" id="reloadBtn" type="button">再読み込み</button>
+
+  <div class="tabs">
+    <button class="tabbtn active" data-tab="input">入力</button>
+    <button class="tabbtn" data-tab="dashboard">ダッシュボード</button>
+    <span class="badge" id="status">ready</span>
   </div>
 </header>
 
 <div class="wrap">
-  <div class="grid">
-    <div class="card c1"><h2>掛け金合計 [円]</h2><div id="barBet" class="chart"></div></div>
-    <div class="card c2"><h2>収支 [円]</h2><div id="barProfit" class="chart"></div></div>
-    <div class="card c3"><h2>回収率 [%]</h2><div id="barRoi" class="chart"></div></div>
+  <!-- INPUT -->
+  <section id="tab-input" class="card">
+    <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+      <div class="hint">
+        送信後も <b>参加者/レース</b> を保持。金額も保持したい場合は下の設定をON。
+      </div>
+      <label class="row" style="margin:0; gap:8px;">
+        <input id="keepAmount" type="checkbox" style="width:auto; transform:scale(1.1);" />
+        <span class="hint">金額も保持</span>
+      </label>
+    </div>
 
-    <div class="card c4"><h2>累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
-    <div class="card c5"><h2>累積収支 [円] <span class="hint">0ライン表示</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
-    <div class="card c6"><h2>累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
-  </div>
+    <form id="entryForm" class="form">
+      <div>
+        <label>参加者</label>
+        <select id="name" required></select>
+      </div>
+
+      <div>
+        <label>G1レース名</label>
+        <select id="race" required></select>
+      </div>
+
+      <div>
+        <label>掛け金（円）</label>
+        <input id="bet" type="number" inputmode="numeric" min="0" step="100" placeholder="例: 1000" required />
+      </div>
+
+      <div>
+        <label>回収額（円）</label>
+        <input id="pay" type="number" inputmode="numeric" min="0" step="100" placeholder="例: 0" required />
+      </div>
+
+      <div class="full row" style="justify-content:space-between;">
+        <button class="btn primary" type="submit">送信</button>
+        <div class="row">
+          <button class="btn" type="button" id="toDash">ダッシュボードへ</button>
+          <button class="btn" type="button" id="clearLocal">入力保持をリセット</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="tab-dashboard" class="hidden">
+    <div class="row" style="justify-content:space-between; margin: 0 0 10px 0;">
+      <span class="badge" id="updated">updated: -</span>
+      <div class="row">
+        <button class="btn" id="reloadBtn" type="button">再読み込み</button>
+        <button class="btn" id="toInput" type="button">入力へ</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card c1"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">掛け金合計 [円]</h2><div id="barBet" class="chart"></div></div>
+      <div class="card c2"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">収支 [円]</h2><div id="barProfit" class="chart"></div></div>
+      <div class="card c3"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">回収率 [%]</h2><div id="barRoi" class="chart"></div></div>
+
+      <div class="card c4"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
+      <div class="card c5"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積収支 [円] <span class="hint">0ライン</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
+      <div class="card c6"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
+    </div>
+  </section>
 </div>
 
 <script>
-  // ====== あなたの本番WebアプリURL ======
+  // ========= あなたの本番WebアプリURL =========
   const GAS_BASE = "https://script.google.com/macros/s/AKfycbw1jiY51U3elE5tyArrcmDH0nYKtJ3N4zrnHx6TNmzojIVOl4-njJaIC7WUlcgp32sbXA/exec";
 
-  // ====== Utilities ======
+  // ========= マスタ（とりあえず固定。将来はGASから読んでもOK） =========
+  const PARTICIPANTS = ["わくだ","きよもと","せきざわ","たきざわ","粗品"];
+  const RACES = [
+    "フェブラリーステークス（2月22日）",
+    "高松宮記念（3月29日）",
+    "大阪杯（4月5日）",
+    "桜花賞（4月12日）",
+    "皐月賞（4月19日）",
+    "天皇賞（春）（5月3日）",
+    "NHKマイルカップ（5月10日）",
+    "ヴィクトリアマイル（5月17日）",
+    "オークス（5月24日）",
+    "日本ダービー（5月31日）",
+    "安田記念（6月7日）",
+    "宝塚記念（6月14日）",
+    "スプリンターズステークス（9月27日）",
+    "秋華賞（10月18日）",
+    "菊花賞（10月25日）",
+    "天皇賞（秋）（11月1日）",
+    "エリザベス女王杯（11月15日）",
+    "マイルチャンピオンシップ（11月22日）",
+    "ジャパンカップ（11月29日）",
+    "チャンピオンズカップ（12月6日）",
+    "阪神ジュベナイルフィリーズ（12月13日）",
+    "朝日杯フューチュリティステークス（12月20日）",
+    "ホープフルステークス（12月26日）",
+    "有馬記念（12月27日）"
+  ];
+
+  // ========= 入力保持（localStorage） =========
+  const LS_KEY = "waku_g1_form_state_v1";
+
+  function saveFormState() {
+    const keepAmount = document.getElementById("keepAmount").checked;
+    const state = {
+      keepAmount,
+      name: document.getElementById("name").value,
+      race: document.getElementById("race").value,
+      bet: keepAmount ? document.getElementById("bet").value : "",
+      pay: keepAmount ? document.getElementById("pay").value : "",
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  }
+
+  function loadFormState() {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    try {
+      const s = JSON.parse(raw);
+      document.getElementById("keepAmount").checked = !!s.keepAmount;
+      if (s.name) document.getElementById("name").value = s.name;
+      if (s.race) document.getElementById("race").value = s.race;
+
+      if (s.keepAmount) {
+        if (s.bet !== undefined) document.getElementById("bet").value = s.bet;
+        if (s.pay !== undefined) document.getElementById("pay").value = s.pay;
+      }
+    } catch {}
+  }
+
+  function clearFormState() {
+    localStorage.removeItem(LS_KEY);
+  }
+
+  // ========= タブ切り替え =========
+  function setTab(tabName) {
+    document.querySelectorAll(".tabbtn").forEach(b => {
+      b.classList.toggle("active", b.dataset.tab === tabName);
+    });
+    document.getElementById("tab-input").classList.toggle("hidden", tabName !== "input");
+    document.getElementById("tab-dashboard").classList.toggle("hidden", tabName !== "dashboard");
+    // タブ状態も保存（任意）
+    localStorage.setItem("waku_g1_active_tab", tabName);
+  }
+
+  // ========= POST（Entriesへ追加） =========
+  async function postEntry({name, race, bet, pay}) {
+    const status = document.getElementById("status");
+    status.textContent = "sending...";
+    status.classList.remove("danger");
+
+    // Apps Script は doPost(e.parameter...) なので URL-encoded で送るのが確実
+    const body = new URLSearchParams({ name, race, bet: String(bet), pay: String(pay) });
+
+    const res = await fetch(GAS_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body
+    });
+
+    const text = (await res.text()).trim();
+    if (!res.ok || !text.startsWith("OK")) {
+      status.textContent = "ERROR";
+      status.classList.add("danger");
+      throw new Error("POST失敗: " + text);
+    }
+    status.textContent = "OK";
+    return text;
+  }
+
+  // ========= GET（WebData JSON） =========
+  async function loadData() {
+    const url = `${GAS_BASE}?type=all&t=${Date.now()}`;
+    const res = await fetch(url, { method:"GET" });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "GAS ok=false");
+    return json;
+  }
+
+  // ========= ECharts =========
   const fmtJPY = (v) => new Intl.NumberFormat('ja-JP').format(v ?? 0);
   const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
-  async function loadData() {
-    const url = `${GAS_BASE}?type=all&t=${Date.now()}`; // cache回避
-    const res = await fetch(url, { method: "GET" });
-    const text = await res.text();
-
-    // GASが "GAS is running" を返す場合、JSONパースで落ちるので分岐
-    if (text.trim().startsWith("GAS is running")) {
-      throw new Error("GASがJSONを返していません。/exec?type=all がJSONになるようにデプロイを更新してください。");
-    }
-
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      throw new Error("JSONの解析に失敗しました: " + text.slice(0, 120));
-    }
-
-    if (!json.ok) throw new Error(json.error || "GAS returned ok=false");
-
-    return {
-      summary: json.summary || [],
-      cumBet: json.cumBet,
-      cumProfit: json.cumProfit,
-      cumRoi: json.cumRoi
-    };
-  }
-
   function makeBar(el, title, participants, values, isPct=false) {
     const chart = echarts.init(document.getElementById(el));
-    const opt = {
-      backgroundColor: 'transparent',
-      grid: { left: 50, right: 18, top: 20, bottom: 45 },
-      xAxis: {
-        type: 'category',
-        data: participants,
-        axisLabel: { color: 'rgba(233,238,252,.85)', rotate: 35 }
+    chart.setOption({
+      backgroundColor:'transparent',
+      grid:{ left:50, right:18, top:20, bottom:45 },
+      xAxis:{ type:'category', data:participants, axisLabel:{ color:'rgba(233,238,252,.85)', rotate:35 } },
+      yAxis:{
+        type:'value',
+        axisLabel:{ color:'rgba(233,238,252,.65)', formatter:(v)=> isPct?`${v}%`:fmtJPY(v) },
+        splitLine:{ lineStyle:{ color:'rgba(255,255,255,.08)' } }
       },
-      yAxis: {
-        type: 'value',
-        axisLabel: {
-          color: 'rgba(233,238,252,.65)',
-          formatter: (v) => isPct ? `${v}%` : fmtJPY(v)
-        },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,.08)' } }
-      },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        formatter: (params) => {
-          const p = params[0];
-          const v = Number(p.value ?? 0);
-          return `${p.name}<br>${title}: <b>${isPct ? fmtPct(v) : "¥"+fmtJPY(v)}</b>`;
+      tooltip:{
+        trigger:'axis',
+        axisPointer:{ type:'shadow' },
+        formatter:(ps)=> {
+          const p=ps[0], v=Number(p.value??0);
+          return `${p.name}<br>${title}: <b>${isPct?fmtPct(v):"¥"+fmtJPY(v)}</b>`;
         }
       },
-      series: [{
-        type: 'bar',
-        data: values,
-        barMaxWidth: 42,
-        itemStyle: { borderRadius: [10,10,0,0] },
-        label: {
-          show: true,
-          position: 'insideTop',
-          color: 'rgba(233,238,252,.95)',
-          formatter: (p) => {
-            const v = Number(p.value ?? 0);
-            return isPct ? `${v.toFixed(0)}%` : `¥${fmtJPY(v)}`;
+      series:[{
+        type:'bar',
+        data:values,
+        barMaxWidth:42,
+        itemStyle:{ borderRadius:[10,10,0,0] },
+        label:{
+          show:true,
+          position:'insideTop',
+          color:'rgba(233,238,252,.95)',
+          formatter:(p)=> {
+            const v=Number(p.value??0);
+            return isPct?`${v.toFixed(0)}%`:`¥${fmtJPY(v)}`;
           }
         }
       }]
-    };
-    chart.setOption(opt);
+    });
     return chart;
   }
 
   function makeLines(el, block, isPct=false, showZero=false) {
     const chart = echarts.init(document.getElementById(el));
-    const dates = (block && block.dates) ? block.dates : [];
-    const legends = (block && block.series) ? Object.keys(block.series) : [];
+    const dates = block?.dates ?? [];
+    const legends = block?.series ? Object.keys(block.series) : [];
     const series = legends.map(name => ({
-      name,
-      type: 'line',
-      data: block.series[name],
-      smooth: true,
-      showSymbol: false,
-      lineStyle: { width: 2 },
-      emphasis: { focus: 'series' }
+      name, type:'line',
+      data:block.series[name],
+      smooth:true, showSymbol:false,
+      lineStyle:{ width:2 },
+      emphasis:{ focus:'series' }
     }));
-
     const opt = {
-      backgroundColor: 'transparent',
-      legend: {
-        data: legends,
-        top: 0,
-        textStyle: { color: 'rgba(233,238,252,.75)' }
+      backgroundColor:'transparent',
+      legend:{ data:legends, top:0, textStyle:{ color:'rgba(233,238,252,.75)' } },
+      grid:{ left:52, right:18, top:28, bottom:42 },
+      xAxis:{ type:'category', data:dates, axisLabel:{ color:'rgba(233,238,252,.75)', rotate:35 } },
+      yAxis:{
+        type:'value',
+        axisLabel:{ color:'rgba(233,238,252,.65)', formatter:(v)=> isPct?`${v}%`:fmtJPY(v) },
+        splitLine:{ lineStyle:{ color:'rgba(255,255,255,.08)' } }
       },
-      grid: { left: 52, right: 18, top: 28, bottom: 42 },
-      xAxis: {
-        type: 'category',
-        data: dates,
-        axisLabel: { color: 'rgba(233,238,252,.75)', rotate: 35 }
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: {
-          color: 'rgba(233,238,252,.65)',
-          formatter: (v) => isPct ? `${v}%` : fmtJPY(v)
-        },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,.08)' } }
-      },
-      tooltip: {
-        trigger: 'axis',
-        formatter: (params) => {
-          const lines = params.map(p => {
-            const v = Number(p.value ?? 0);
-            return `${p.marker} ${p.seriesName}: <b>${isPct ? fmtPct(v) : "¥"+fmtJPY(v)}</b>`;
-          }).join('<br>');
+      tooltip:{
+        trigger:'axis',
+        formatter:(params)=> {
+          const lines=params.map(p=>{
+            const v=Number(p.value??0);
+            return `${p.marker} ${p.seriesName}: <b>${isPct?fmtPct(v):"¥"+fmtJPY(v)}</b>`;
+          }).join("<br>");
           return `${params[0].axisValue}<br>${lines}`;
         }
       },
       series
     };
-
-    if (showZero){
-      opt.series.forEach(s => (s.markLine = {
-        symbol: 'none',
-        lineStyle: { type: 'dashed', opacity: .5 },
-        data: [{ yAxis: 0 }]
-      }));
+    if (showZero) {
+      opt.series.forEach(s => s.markLine = {
+        symbol:'none',
+        lineStyle:{ type:'dashed', opacity:.5 },
+        data:[{ yAxis:0 }]
+      });
     }
-
     chart.setOption(opt);
     return chart;
   }
 
-  // ====== Main render ======
   let charts = [];
-
-  async function render() {
-    // dispose old charts (再描画対応)
-    charts.forEach(c => c && c.dispose && c.dispose());
+  async function renderDashboard() {
+    // 旧チャートを破棄（再読み込み対策）
+    charts.forEach(c => c?.dispose?.());
     charts = [];
 
-    const badge = document.getElementById('updated');
-    badge.classList.remove('danger');
+    const updated = document.getElementById("updated");
+    updated.textContent = "updated: loading...";
 
-    try {
-      const DATA = await loadData();
+    const data = await loadData();
 
-      const participants = DATA.summary.map(d => d.participant);
-      const betValues = DATA.summary.map(d => Number(d.bet_total ?? 0));
-      const profitValues = DATA.summary.map(d => Number(d.profit_total ?? 0));
-      const roiValues = DATA.summary.map(d => Number(d.roi ?? 0));
+    const participants = data.summary.map(d => d.participant);
+    charts.push(makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false));
+    charts.push(makeBar("barProfit", "収支", participants, data.summary.map(d=>Number(d.profit_total??0)), false));
+    charts.push(makeBar("barRoi", "回収率", participants, data.summary.map(d=>Number(d.roi??0)), true));
 
-      charts.push(makeBar('barBet', '掛け金合計', participants, betValues, false));
-      charts.push(makeBar('barProfit', '収支', participants, profitValues, false));
-      charts.push(makeBar('barRoi', '回収率', participants, roiValues, true));
+    charts.push(makeLines("lineCumBet", data.cumBet, false, false));
+    charts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
+    charts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
 
-      charts.push(makeLines('lineCumBet', DATA.cumBet, false, false));
-      charts.push(makeLines('lineCumProfit', DATA.cumProfit, false, true));
-      charts.push(makeLines('lineCumRoi', DATA.cumRoi, true, false));
+    updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
-      badge.textContent = 'updated: ' + new Date().toLocaleString('ja-JP');
-
-      window.addEventListener('resize', () => charts.forEach(c => c.resize()));
-
-    } catch (err) {
-      badge.textContent = 'updated: ERROR';
-      badge.classList.add('danger');
-      alert("データ取得エラー:\n" + err.message + "\n\n確認:\n1) /exec?type=all がJSONを返す\n2) 使ってるURLが本番デプロイURL\n3) WebData範囲が空じゃない");
-      console.error(err);
-    }
+    window.addEventListener("resize", () => charts.forEach(c => c.resize()));
   }
 
-  document.getElementById('reloadBtn').addEventListener('click', render);
-  render();
+  // ========= 初期化 =========
+  function fillSelect(id, items) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = "";
+    items.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    });
+  }
+
+  // selectを埋める
+  fillSelect("name", PARTICIPANTS);
+  fillSelect("race", RACES);
+
+  // 入力保持：変更ごとに保存
+  ["name","race","bet","pay","keepAmount"].forEach(id => {
+    document.getElementById(id).addEventListener("change", saveFormState);
+    document.getElementById(id).addEventListener("input", saveFormState);
+  });
+
+  // 保存済み復元
+  loadFormState();
+
+  // タブ：前回状態復元
+  const savedTab = localStorage.getItem("waku_g1_active_tab");
+  if (savedTab === "dashboard") setTab("dashboard");
+
+  // タブボタン
+  document.querySelectorAll(".tabbtn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const t = btn.dataset.tab;
+      setTab(t);
+      if (t === "dashboard") {
+        try { await renderDashboard(); }
+        catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
+      }
+    });
+  });
+
+  // 入力→ダッシュボード
+  document.getElementById("toDash").addEventListener("click", async () => {
+    setTab("dashboard");
+    try { await renderDashboard(); }
+    catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
+  });
+
+  // ダッシュボード→入力
+  document.getElementById("toInput").addEventListener("click", () => setTab("input"));
+
+  // 再読み込み
+  document.getElementById("reloadBtn").addEventListener("click", async () => {
+    try { await renderDashboard(); }
+    catch (e) { alert("再読み込みエラー: " + e.message); }
+  });
+
+  // 入力保持リセット
+  document.getElementById("clearLocal").addEventListener("click", () => {
+    clearFormState();
+    alert("入力保持をリセットしました");
+  });
+
+  // 送信
+  document.getElementById("entryForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+
+    const name = document.getElementById("name").value;
+    const race = document.getElementById("race").value;
+    const bet  = Number(document.getElementById("bet").value || 0);
+    const pay  = Number(document.getElementById("pay").value || 0);
+
+    try {
+      await postEntry({ name, race, bet, pay });
+
+      // ✅ 送信後に入力が消える問題：ここで reset しない（保持）
+      // ただし「金額は保持しない」設定なら bet/pay だけクリア
+      const keepAmount = document.getElementById("keepAmount").checked;
+      if (!keepAmount) {
+        document.getElementById("bet").value = "";
+        document.getElementById("pay").value = "";
+      }
+
+      // 状態保存（次回も保持）
+      saveFormState();
+
+      // おまけ：すぐダッシュボード反映したいならON
+      // setTab("dashboard"); await renderDashboard();
+
+    } catch (e) {
+      alert(e.message);
+    }
+  });
 </script>
 </body>
 </html>
