@@ -116,11 +116,15 @@
 
     /* 収支表タブ */
     .tableWrap{
-      overflow-x:auto;
+      overflow-x:hidden; /* ★スマホでも横スクロールさせない（崩れない設計にする） */
       -webkit-overflow-scrolling:touch;
       border-radius:12px;
+      width:100%;
     }
-    .chartTable{height:560px;}
+    .chartTable{
+      width:100%;
+      height:560px;
+    }
 
     @media (max-width: 900px){
       .form{grid-template-columns: 1fr;}
@@ -150,17 +154,6 @@
       font-size:12px;
       color: rgba(233,238,252,.65);
       word-break: break-all;
-    }
-
-    /* ★縮小中だけ中央寄せ（左の空白を消す） */
-    .tableWrap.centering{
-      display:flex;
-      justify-content:center;
-    }
-
-    /* ★iPhoneは横スクロールさせず、縮小で収める */
-    @media (max-width: 900px){
-      .tableWrap{ overflow-x:hidden; }
     }
   </style>
 </head>
@@ -287,8 +280,36 @@
   // ========= マスタ =========
   const PARTICIPANTS = ["わくだ","きよもと","せきざわ","たきざわ","粗品"];
 
-  // ★入力のセレクト用（あなたの統一リスト：日付なし）
+  // 入力用（あなたの元の表示そのまま）
   const RACES = [
+    "フェブラリーステークス（2月22日）",
+    "高松宮記念（3月29日）",
+    "大阪杯（4月5日）",
+    "桜花賞（4月12日）",
+    "皐月賞（4月19日）",
+    "天皇賞（春）（5月3日）",
+    "NHKマイルカップ（5月10日）",
+    "ヴィクトリアマイル（5月17日）",
+    "オークス（5月24日）",
+    "日本ダービー（5月31日）",
+    "安田記念（6月7日）",
+    "宝塚記念（6月14日）",
+    "スプリンターズステークス（9月27日）",
+    "秋華賞（10月18日）",
+    "菊花賞（10月25日）",
+    "天皇賞（秋）（11月1日）",
+    "エリザベス女王杯（11月15日）",
+    "マイルチャンピオンシップ（11月22日）",
+    "ジャパンカップ（11月29日）",
+    "チャンピオンズカップ（12月6日）",
+    "阪神ジュベナイルフィリーズ（12月13日）",
+    "朝日杯フューチュリティステークス（12月20日）",
+    "ホープフルステークス（12月26日）",
+    "有馬記念（12月27日）"
+  ];
+
+  // 収支表（表示用）: 日付なし・省略名（あなたの指定）
+  const TABLE_RACES = [
     "フェブラリーS",
     "高松宮記念",
     "大阪杯",
@@ -328,76 +349,16 @@
   };
   const getColor = (name) => COLOR_MAP[name] || "#7aa2ff";
 
-  // ========= データ側のレース名ゆれ吸収 → 表示名へ =========
-  // （GAS/シート側が "フェブラリーステークス（2月22日）" みたいでも、ここで "フェブラリーS" に寄せる）
-  const RACE_ALIAS = new Map([
-    ["フェブラリーステークス", "フェブラリーS"],
-    ["フェブラリーS", "フェブラリーS"],
-
-    ["高松宮記念", "高松宮記念"],
-    ["大阪杯", "大阪杯"],
-    ["桜花賞", "桜花賞"],
-    ["皐月賞", "皐月賞"],
-    ["天皇賞（春）", "天皇賞（春）"],
-    ["天皇賞(春)", "天皇賞（春）"],
-
-    ["NHKマイルカップ", "NHKマイルカップ"],
-    ["ヴィクトリアマイル", "ヴィクトリアマイル"],
-
-    ["優駿牝馬", "優駿牝馬（オークス）"],
-    ["オークス", "優駿牝馬（オークス）"],
-    ["優駿牝馬（オークス）", "優駿牝馬（オークス）"],
-
-    ["東京優駿", "東京優駿（日本ダービー）"],
-    ["日本ダービー", "東京優駿（日本ダービー）"],
-    ["東京優駿（日本ダービー）", "東京優駿（日本ダービー）"],
-
-    ["安田記念", "安田記念"],
-    ["宝塚記念", "宝塚記念"],
-
-    ["スプリンターズステークス", "スプリンターズS"],
-    ["スプリンターズS", "スプリンターズS"],
-
-    ["秋華賞", "秋華賞"],
-    ["菊花賞", "菊花賞"],
-
-    ["天皇賞（秋）", "天皇賞（秋）"],
-    ["天皇賞(秋)", "天皇賞（秋）"],
-
-    ["エリザベス女王杯", "エリザベス女王杯"],
-
-    ["マイルチャンピオンシップ", "マイルチャンピオンシップ"],
-    ["マイルCS", "マイルチャンピオンシップ"],
-
-    ["ジャパンカップ", "ジャパンカップ"],
-
-    ["チャンピオンズカップ", "チャンピオンズカップ"],
-    ["チャンピオンズC", "チャンピオンズカップ"],
-
-    ["阪神ジュベナイルフィリーズ", "阪神ジュベナイルフィリーズ"],
-    ["阪神JF", "阪神ジュベナイルフィリーズ"],
-
-    ["朝日杯フューチュリティステークス", "朝日杯フューチュリティS"],
-    ["朝日杯フューチュリティS", "朝日杯フューチュリティS"],
-    ["朝日杯FS", "朝日杯フューチュリティS"],
-
-    ["ホープフルステークス", "ホープフルS"],
-    ["ホープフルS", "ホープフルS"],
-
-    ["有馬記念", "有馬記念"],
-  ]);
-
-  function normalizeRaceKey(s) {
-    if (!s) return "";
-    let t = String(s).trim();
-    t = t.replace(/（.*?）/g, ""); // ★日付など括弧を落とす（"（2月22日）" を消す）
-    t = t.replace(/\s+/g, "");
-    return t;
-  }
-  function toDisplayRaceName(raw) {
-    const key = normalizeRaceKey(raw);
-    return RACE_ALIAS.get(key) || raw;
-  }
+  // ========= 日付 -> レース名 =========
+  const RACE_BY_DATE = (() => {
+    const map = {};
+    for (const s of RACES) {
+      const m = s.match(/^(.+?)（(.+?)）$/);
+      if (m) map[m[2]] = m[1];
+    }
+    return map;
+  })();
+  const getRaceNameByDate = (d) => RACE_BY_DATE[d] || "";
 
   // ========= 先読みキャッシュ =========
   let cachedAllData = null;
@@ -485,6 +446,8 @@
     document.getElementById("tab-table").classList.toggle("hidden", tabName !== "table");
     document.getElementById("tab-history").classList.toggle("hidden", tabName !== "history");
     localStorage.setItem("waku_g1_active_tab", tabName);
+
+    // 入力以外に行ったら先読み
     if (tabName !== "dashboard" && tabName !== "table") prefetchAllData();
   }
 
@@ -509,20 +472,24 @@
     try { chart?.dispose?.(); } catch {}
   }
 
-  // ★余白最適化
+  // ★余白最適化（左と下をさらに詰める）
   function getChartLayout() {
     const mobile = isMobile();
     return {
       mobile,
+
       gridLeft:  mobile ? 5 : 46,
       gridRight: mobile ? 10 : 14,
       gridTopBar: 18,
       gridTopLine: 30,
+
       gridBottomBar:  mobile ? 32 : 40,
       gridBottomLine: mobile ? 15 : 34,
+
       fontAxis: mobile ? 9 : 11,
       fontLegend: mobile ? 10 : 12,
       axisMargin: mobile ? 6 : 8,
+
       rotateBarX: 35
     };
   }
@@ -580,6 +547,7 @@
     return chart;
   }
 
+  // ★折れ線：横軸は「レース回数」
   function makeLines(el, block, isPct=false, showZero=false) {
     const chart = echarts.init(document.getElementById(el));
     const L = getChartLayout();
@@ -619,7 +587,7 @@
           fontSize:L.fontAxis,
           margin:6,
           interval: 0,
-          formatter: (val) => {
+          formatter: (val, idx) => {
             const n = Number(val);
             const last = xLabels.length;
             if (n === 1 || n === last) return String(n);
@@ -649,11 +617,14 @@
         formatter:(params)=> {
           const idx = Math.max(0, Number(params[0].axisValue) - 1);
           const d = dates[idx] ?? "";
-          const head = `G${idx + 1}`;
+          const raceName = d ? getRaceNameByDate(d) : "";
+          const head = raceName ? `G${idx + 1}　${raceName}（${d}）` : `G${idx + 1}（${d}）`;
+
           const lines = params.map(p=>{
             const v=Number(p.value??0);
             return `${p.marker} ${p.seriesName}: <b>${isPct?fmtPct(v):"¥"+fmtJPY(v)}</b>`;
           }).join("<br>");
+
           return `${head}<br>${lines}`;
         }
       },
@@ -674,33 +645,59 @@
 
   // ========= 収支表（ヒートマップ） =========
 
-  // ★時系列順（固定）：フェブラリーSが最初、有馬記念が最後
-  const RACE_ORDER_LIST = [...RACES]; // すでに時系列で並んでる前提
-  const RACE_ORDER = (() => {
+  // ★シート上のレース名（揺れ）→表示用省略名へ寄せる
+  // 例: "フェブラリーS（2月22日）" / "フェブラリーS" / "フェブラリーステークス" / "東京優駿（日本ダービー）" etc
+  const normalize = (s) => String(s ?? "")
+    .replace(/（.*?）/g, "")   // かっこの日付など除去
+    .replace(/\s+/g, "")
+    .trim();
+
+  const RACE_ALIAS = (() => {
     const m = new Map();
-    RACE_ORDER_LIST.forEach((name, i) => m.set(name, i));
+
+    // 基本（表示名→表示名）
+    TABLE_RACES.forEach(r => m.set(normalize(r), r));
+
+    // よくある揺れを追加（必要に応じて増やせる）
+    m.set(normalize("フェブラリーステークス"), "フェブラリーS");
+    m.set(normalize("スプリンターズステークス"), "スプリンターズS");
+    m.set(normalize("朝日杯フューチュリティステークス"), "朝日杯フューチュリティS");
+    m.set(normalize("ホープフルステークス"), "ホープフルS");
+    m.set(normalize("オークス"), "優駿牝馬（オークス）");
+    m.set(normalize("日本ダービー"), "東京優駿（日本ダービー）");
+    m.set(normalize("東京優駿"), "東京優駿（日本ダービー）");
+    m.set(normalize("優駿牝馬"), "優駿牝馬（オークス）");
+
     return m;
   })();
 
+  function toDisplayRaceName(raw) {
+    const key = normalize(raw);
+    return RACE_ALIAS.get(key) || raw; // マッチしない場合はそのまま
+  }
+
+  // ★順番はTABLE_RACESで固定（GASのrows順は無視する）
   function sortProfitRowsByMaster(profitTable) {
     const headers = profitTable?.headers ?? [];
     const rows = (profitTable?.rows ?? []).slice();
-    if (rows.length === 0) return profitTable;
+    if (headers.length < 2) return profitTable;
 
-    // rows: [race, v1, v2...]
-    const mappedRows = rows.map(r => {
+    const peopleCount = headers.length - 1;
+
+    // rowsを表示名でMap化
+    const rowMap = new Map();
+    for (const r of rows) {
       const rawRace = String(r?.[0] ?? "");
       const disp = toDisplayRaceName(rawRace);
       const copied = r.slice();
       copied[0] = disp;
-      return copied;
-    });
+      rowMap.set(disp, copied);
+    }
 
-    const sorted = mappedRows.sort((a, b) => {
-      const ai = RACE_ORDER.has(a[0]) ? RACE_ORDER.get(a[0]) : 9999;
-      const bi = RACE_ORDER.has(b[0]) ? RACE_ORDER.get(b[0]) : 9999;
-      if (ai !== bi) return ai - bi;
-      return String(a[0]).localeCompare(String(b[0]), "ja");
+    // TABLE_RACES順で埋める（欠けは0埋め）
+    const sorted = TABLE_RACES.map(raceName => {
+      if (rowMap.has(raceName)) return rowMap.get(raceName);
+      return [raceName, ...Array(peopleCount).fill(0)];
     });
 
     return { headers, rows: sorted };
@@ -712,10 +709,9 @@
     const rows = profitTable?.rows ?? [];
 
     if (headers.length < 2 || rows.length === 0) {
-      return { option: null, designWidth: 600 };
+      return { option: null };
     }
 
-    // ヘッダの並び：レース名 + 人
     const people = headers.slice(1);
     const races = rows.map(r => String(r[0] ?? ""));
 
@@ -738,11 +734,11 @@
 
     const mobile = isMobile();
 
-    // ★スマホは「見切れない範囲で左幅を詰める」+ 「列も詰める」
-    const leftW = mobile ? 124 : 160;
-    const colW  = mobile ? 82  : 112;
+    // ★iPhoneで横スクロールなしで「収める」前提のレイアウト
+    // leftは詰める / 列はやや広げる / 右余白を減らす
+    const leftW = mobile ? 96 : 160;
+    const gridRight = mobile ? 4 : 16;
 
-    const chartWidth = leftW + people.length * colW + 20;
     const cellH = mobile ? 24 : 26;
 
     const option = {
@@ -750,9 +746,9 @@
       backgroundColor: 'transparent',
 
       grid: {
-        top: 34,
+        top: 36,
         left: leftW,
-        right: 12,
+        right: gridRight,
         bottom: 10,
         containLabel: false
       },
@@ -761,10 +757,11 @@
         type: 'category',
         data: people,
         axisLabel: {
-          color:'rgba(233,238,252,.95)',
-          fontSize: mobile ? 12 : 12,
-          fontWeight: 800,        // ★名前を目立たせる
-          interval: 0
+          color:'rgba(233,238,252,.98)',
+          fontSize: mobile ? 13 : 12,
+          fontWeight: 900,
+          interval: 0,
+          margin: 10
         },
         axisLine: { lineStyle: { color:'rgba(255,255,255,.18)' } },
         axisTick: { alignWithLabel: true }
@@ -774,11 +771,10 @@
         type: 'category',
         data: races,
         axisLabel: {
-          color:'rgba(233,238,252,.85)',
+          color:'rgba(233,238,252,.86)',
           fontSize: mobile ? 11 : 11,
-          width: leftW - 10,
-          overflow: 'truncate',   // ★長いのは…にする（iPhoneで見切れ対策）
-          formatter: (v) => v
+          width: leftW - 8,
+          overflow: 'truncate'
         },
         axisLine: { lineStyle: { color:'rgba(255,255,255,.14)' } },
         axisTick: { show: false }
@@ -790,9 +786,7 @@
         max: absMax,
         show: false,
         calculable: false,
-        inRange: {
-          color: ['#ff6b6b', '#141a2a', '#7aa2ff'] // 赤→暗め→青
-        }
+        inRange: { color: ['#ff6b6b', '#141a2a', '#7aa2ff'] }
       },
 
       tooltip: {
@@ -835,7 +829,6 @@
 
           const stroke = 'rgba(255,255,255,.10)';
           const lw = 1;
-
           const txt = Math.abs(val) > absMax * 0.55 ? 'rgba(255,255,255,.92)' : 'rgba(233,238,252,.90)';
 
           return {
@@ -857,7 +850,7 @@
                   y: rect.y + rect.height/2,
                   text,
                   fill: txt,
-                  fontSize: mobile ? 11 : 11,
+                  fontSize: mobile ? 10 : 11,  // ★セル内数字を1つ小さく
                   fontWeight: 700,
                   align: 'center',
                   verticalAlign: 'middle'
@@ -869,26 +862,7 @@
       }]
     };
 
-    return { option, designWidth: chartWidth };
-  }
-
-  function applyMobileScaleForTable(designWidth) {
-    const dom = document.getElementById("profitTable");
-    const wrap = document.getElementById("profitTableWrap");
-    const avail = wrap?.clientWidth || window.innerWidth;
-
-    const safeAvail = Math.max(280, avail - 2);
-
-    if (isMobile() && designWidth > safeAvail) {
-      const s = Math.max(0.86, Math.min(1, safeAvail / designWidth));
-      dom.style.width = `${designWidth}px`;
-      dom.style.transform = `scale(${s})`;
-      wrap.classList.add("centering");
-    } else {
-      dom.style.transform = "scale(1)";
-      dom.style.width = "100%";
-      wrap.classList.remove("centering");
-    }
+    return { option };
   }
 
   function makeProfitTable() {
@@ -898,26 +872,17 @@
     return {
       chart,
       set: (profitTable) => {
-        const { option, designWidth } = buildProfitTableOption(profitTable);
-
-        applyMobileScaleForTable(designWidth);
+        const { option } = buildProfitTableOption(profitTable);
 
         if (!option) {
           chart.clear();
           chart.setOption({
-            title: {
-              text: '収支データがありません',
-              left: 'center',
-              top: 'middle',
-              textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 }
-            }
-          }, true);
-          requestAnimationFrame(() => chart.resize());
+            title: { text: '収支データがありません', left: 'center', top: 'middle',
+              textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
+          });
           return;
         }
-
         chart.setOption(option, true);
-        requestAnimationFrame(() => chart.resize());
       }
     };
   }
@@ -927,12 +892,21 @@
   let tableChartWrap = null;
   let resizeBound = false;
 
+  function nextPaint() {
+    return new Promise(resolve => {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+    });
+  }
+
   async function renderDashboard() {
     dashCharts.forEach(c => safeDispose(c));
     dashCharts = [];
 
     const updated = document.getElementById("updatedDash");
     updated.textContent = "updated: loading...";
+
+    // ★表示直後のDOM確定待ち（初回描画失敗対策）
+    await nextPaint();
 
     const data = await getAllDataFast();
     const participants = data.summary.map(d => d.participant);
@@ -954,10 +928,23 @@
     const updated = document.getElementById("updatedTable");
     updated.textContent = "updated: loading...";
 
+    // ★表示直後のDOM確定待ち（初回描画失敗対策）
+    await nextPaint();
+
     const data = await getAllDataFast();
 
-    if (!tableChartWrap) tableChartWrap = makeProfitTable();
+    if (!tableChartWrap) {
+      tableChartWrap = makeProfitTable();
+    }
+
+    // ★init直後にresizeを噛ませる（iPhoneで0幅判定になるのを防ぐ）
+    tableChartWrap.chart.resize();
+
     tableChartWrap.set(data.profitTable);
+
+    // ★描画後もう一回resize（初回だけの保険）
+    await nextPaint();
+    tableChartWrap.chart.resize();
 
     updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
@@ -968,11 +955,7 @@
     resizeBound = true;
     window.addEventListener("resize", () => {
       dashCharts.forEach(c => c?.resize?.());
-      if (tableChartWrap?.chart) {
-        requestAnimationFrame(() => {
-          try { tableChartWrap.chart.resize(); } catch {}
-        });
-      }
+      tableChartWrap?.chart?.resize?.();
     });
   }
 
@@ -997,55 +980,39 @@
   });
 
   loadFormState();
+  setTimeout(prefetchAllData, 0);
 
-  // ★起動直後に先読み（体感を速く）
-  prefetchAllData();
-
-  // ===== 初期タブ復元 =====
   const savedTab = localStorage.getItem("waku_g1_active_tab");
-  if (savedTab === "dashboard" || savedTab === "table" || savedTab === "history") {
-    setTab(savedTab);
-  }
+  if (savedTab === "dashboard" || savedTab === "table" || savedTab === "history") setTab(savedTab);
 
-  // ★display:none → block 直後はサイズが0になりがちなので、2フレーム待って描画する
-  function afterVisibleRender(fn) {
-    requestAnimationFrame(() => requestAnimationFrame(fn));
-  }
-
-  // 初期表示でダッシュボード/収支表なら自動描画
-  afterVisibleRender(async () => {
+  // ★初期表示のタブがdashboard/tableの場合、必ず初回描画する
+  (async () => {
     try {
-      const t = localStorage.getItem("waku_g1_active_tab");
-      if (t === "dashboard") await renderDashboard();
-      if (t === "table") await renderTable();
+      if (savedTab === "dashboard") await renderDashboard();
+      if (savedTab === "table") await renderTable();
     } catch (e) {
-      alert("初期描画エラー: " + e.message);
+      alert("取得エラー: " + e.message);
     }
-  });
+  })();
 
-  // タブ切り替え
   document.querySelectorAll(".tabbtn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const t = btn.dataset.tab;
       setTab(t);
-      afterVisibleRender(async () => {
-        try {
-          if (t === "dashboard") await renderDashboard();
-          if (t === "table") await renderTable();
-        } catch (e) {
-          alert("取得エラー: " + e.message);
-        }
-      });
+
+      try {
+        if (t === "dashboard") await renderDashboard();
+        if (t === "table") await renderTable();
+      } catch (e) {
+        alert("取得エラー: " + e.message);
+      }
     });
   });
 
-  // 入力からダッシュボードへ
-  document.getElementById("toDash").addEventListener("click", () => {
+  document.getElementById("toDash").addEventListener("click", async () => {
     setTab("dashboard");
-    afterVisibleRender(async () => {
-      try { await renderDashboard(); }
-      catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
-    });
+    try { await renderDashboard(); }
+    catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
   });
 
   document.getElementById("toInputFromDash").addEventListener("click", () => setTab("input"));
@@ -1069,7 +1036,6 @@
     }
   });
 
-  // 送信
   document.getElementById("entryForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
 
