@@ -392,18 +392,22 @@
   const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
   // 共通：余白とフォント（スマホで縦軸が欠けないように）
-  function getChartLayout() {
-    const mobile = isMobile();
-    return {
-      mobile,
-      gridLeft: mobile ? 76 : 56,    // ★iPhoneでも6桁が欠けにくい
-      gridRight: 18,
-      fontAxis: mobile ? 11 : 12,
-      fontLegend: mobile ? 11 : 12,
-      axisMargin: mobile ? 10 : 8,
-      rotateX: 35
-    };
-  }
+function getChartLayout() {
+  const mobile = isMobile();
+  return {
+    mobile,
+    // ★元のバランスに戻す（leftを増やしすぎない）
+    gridLeft: mobile ? 56 : 52,
+    gridRight: 18,
+
+    // ★フォントだけ小さく（スマホ中心）
+    fontAxis: mobile ? 10 : 12,
+    fontLegend: mobile ? 11 : 12,
+
+    axisMargin: mobile ? 8 : 8,
+    rotateX: 35
+  };
+}
 
   // ★棒グラフ：参加者ごとの色を固定
   function makeBar(el, title, participants, values, isPct=false) {
@@ -476,6 +480,11 @@
     const L = getChartLayout();
 
     const dates = block?.dates ?? [];
+    const toMonth = (s) => {
+      const m = String(s).match(/^(\d+)月/);
+      return m ? `${m[1]}月` : String(s);
+    };
+
     const legends = block?.series ? Object.keys(block.series) : [];
 
     const series = legends.map(name => ({
@@ -509,9 +518,17 @@
           color:'rgba(233,238,252,.75)',
           rotate: L.rotateX,
           fontSize: L.fontAxis,
-          margin: L.axisMargin
-        }
-      },
+          margin: L.axisMargin,
+
+    // ★月だけ表示（同じ月が続くところは空欄にして見やすく）
+    formatter: (value, idx) => {
+      const cur = toMonth(value);
+      const prev = idx > 0 ? toMonth(dates[idx - 1]) : "";
+      return (idx === 0 || cur !== prev) ? cur : "";
+    }
+  }
+},
+
       yAxis:{
         type:'value',
         axisLabel:{
@@ -576,25 +593,17 @@
 
     updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
-    // resizeイベントは多重登録しない
-    if (!resizeBound) {
-      resizeBound = true;
-      let timer = null;
-      window.addEventListener("resize", () => {
-        // 連打対策（軽いデバウンス）
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          // サイズ変更で余白/フォントが変わる可能性があるので再描画が確実
-          // データ量が軽いのでOK
-          if (localStorage.getItem("waku_g1_active_tab") === "dashboard") {
-            renderDashboard().catch(()=>{});
-          } else {
-            charts.forEach(c => c.resize());
-          }
-        }, 150);
-      });
-    }
+  // resizeイベントは多重登録しない（※再描画はしない。サイズ調整だけ）
+  if (!resizeBound) {
+    resizeBound = true;
+
+    window.addEventListener("resize", () => {
+      // グラフのキャンバスサイズだけ調整（見た目が安定する）
+      charts.forEach(c => c?.resize?.());
+    });
   }
+}
+
 
   // ========= 初期化 =========
   function fillSelect(id, items) {
