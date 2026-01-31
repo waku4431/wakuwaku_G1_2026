@@ -116,16 +116,25 @@
 
     /* 収支表タブ */
     .tableWrap{
-      overflow-x:auto;
+      overflow-x:auto; /* ←横スクロールは基本auto。ただしiPhoneはJSで縮小して極力発生させない */
       -webkit-overflow-scrolling:touch;
       border-radius:12px;
     }
     .chartTable{height:560px;}
 
-    @media (max-width: 900px){
-       .tableWrap{ overflow-x:hidden; } /* ★iPhoneで横スクロール禁止 */
-     }
+    /* ★縮小の基点（JSでscaleする） */
+    #profitTable{
+      width:100%;
+      transform-origin:left top;
+    }
 
+    @media (max-width: 900px){
+      .form{grid-template-columns: 1fr;}
+      .c1,.c2,.c3,.c4,.c5,.c6{grid-column: span 12;}
+      .chart{height:295px;}
+      .chartTall{height:335px;}
+      .chartTable{height:520px;}
+    }
 
     a.linkcard{
       display:block;
@@ -273,8 +282,7 @@
   // ========= マスタ =========
   const PARTICIPANTS = ["わくだ","きよもと","せきざわ","たきざわ","粗品"];
 
-  // ★あなたが指定した表記に統一（これが「正」）
-// ★省略レース名（表示も処理もこれに統一）
+  // ★省略レース名（表示も処理もこれに統一）
   const RACES = [
     "フェブラリーS",
     "高松宮記念",
@@ -300,7 +308,7 @@
     "朝日杯フューチュリティS",
     "ホープフルS",
     "有馬記念"
-];
+  ];
 
   // ========= モバイル判定 =========
   const isMobile = () => window.innerWidth <= 420;
@@ -314,17 +322,6 @@
     "粗品":     "#a78bfa",
   };
   const getColor = (name) => COLOR_MAP[name] || "#7aa2ff";
-
-  // ========= 日付 -> レース名 =========
-  const RACE_BY_DATE = (() => {
-    const map = {};
-    for (const s of RACES) {
-      const m = s.match(/^(.+?)（(.+?)）$/);
-      if (m) map[m[2]] = m[1];
-    }
-    return map;
-  })();
-  const getRaceNameByDate = (d) => RACE_BY_DATE[d] || "";
 
   // ========= 先読みキャッシュ =========
   let cachedAllData = null;
@@ -403,6 +400,10 @@
   }
 
   // ========= タブ切り替え =========
+  function knowTab(tabName) {
+    return (tabName === "input" || tabName === "dashboard" || tabName === "table" || tabName === "history");
+  }
+
   function setTab(tabName) {
     document.querySelectorAll(".tabbtn").forEach(b => {
       b.classList.toggle("active", b.dataset.tab === tabName);
@@ -412,6 +413,8 @@
     document.getElementById("tab-table").classList.toggle("hidden", tabName !== "table");
     document.getElementById("tab-history").classList.toggle("hidden", tabName !== "history");
     localStorage.setItem("waku_g1_active_tab", tabName);
+
+    // 入力画面以外は先読みしておく（体感を軽く）
     if (tabName !== "dashboard" && tabName !== "table") prefetchAllData();
   }
 
@@ -581,8 +584,7 @@
         formatter:(params)=> {
           const idx = Math.max(0, Number(params[0].axisValue) - 1);
           const d = dates[idx] ?? "";
-          const raceName = d ? getRaceNameByDate(d) : "";
-          const head = raceName ? `G${idx + 1}　${raceName}（${d}）` : `G${idx + 1}（${d}）`;
+          const head = `G${idx + 1}`;
 
           const lines = params.map(p=>{
             const v=Number(p.value??0);
@@ -609,76 +611,81 @@
 
   // ========= 収支表（ヒートマップ） =========
 
-  // ★表記ゆれ吸収キー（GASのレース名が日付あり/なし等でも同一視）
-function normalizeRaceKey(s) {
-  if (!s) return "";
-  let t = String(s).trim();
-
-  // 日付の括弧は落とす（入っててもOKにする）
-  t = t.replace(/（\d+月\d+日）/g, "");
-
-  t = t.replace(/[【】\[\]]/g, "");
-  t = t.replace(/\s+/g, "");
-  t = t.replace(/ステークス/g, "S").replace(/Ｓ/g, "S");
-  return t;
-}
-
-  function isTotalLabel(label) {
-    const k = normalizeRaceKey(label).toUpperCase();
-    // "合計", "総計", "TOTAL" などを合計行として検出
-    return k === "合計" || k === "総計" || k === "TOTAL" || k === "GRANDTOTAL";
+  // ★レースキー正規化（表記ゆれ吸収：日付があってもOK）
+  function normalizeRaceKey(s) {
+    if (!s) return "";
+    let t = String(s).trim();
+    t = t.replace(/（\d+月\d+日）/g, ""); // 日付括弧を落とす（入っててもOK）
+    t = t.replace(/[【】\[\]]/g, "");
+    t = t.replace(/\s+/g, "");
+    t = t.replace(/ステークス/g, "S").replace(/Ｓ/g, "S");
+    return t;
   }
 
-  // ★収支表は「RACESマスタ順」で必ず再構築し、表示ラベルもマスタに統一
+  // ★マスタ順で並べて不足行は0埋め（RACESを絶対正とする）
   function rebuildProfitRowsByMaster(profitTableRaw) {
     const headers = profitTableRaw?.headers ?? [];
-    const rowsRaw = (profitTableRaw?.rows ?? []).slice();
+    const rowsRaw = profitTableRaw?.rows ?? [];
     if (headers.length < 2) return { headers, rows: [] };
 
-    const rowMap = new Map(); // key: normalizeRaceKey(rowLabel) => row
-    let totalRow = null;
-
+    // 入力側（GAS）から来た rows を map 化
+    const rowMap = new Map();
     for (const r of rowsRaw) {
-      const label = String(r?.[0] ?? "");
-      if (isTotalLabel(label)) {
-        totalRow = r;
-        continue;
-      }
-      rowMap.set(normalizeRaceKey(label), r);
+      const raceLabel = String(r?.[0] ?? "");
+      const key = normalizeRaceKey(raceLabel);
+      if (!key) continue;
+      rowMap.set(key, r);
     }
 
-    // マスタ順で行を作る（見つかったら値を採用、見つからないなら0行）
+    const people = headers.slice(1);
+
+    // マスタ順（上からフェブラリーS → 有馬記念）
     const rows = RACES.map(masterLabel => {
       const key = normalizeRaceKey(masterLabel);
       const found = rowMap.get(key);
 
       if (found) {
-        // ★表示ラベルは必ず masterLabel に統一
-        const copied = found.slice();
-        copied[0] = masterLabel;
-        return copied;
+        // 先頭列だけマスタ表記に統一（＝日付なし省略名）
+        const out = [masterLabel];
+        for (let i = 0; i < people.length; i++) out.push(Number(found[i + 1] ?? 0));
+        return out;
       }
 
-      // 未開催など → 0行
-      return [masterLabel, ...headers.slice(1).map(() => 0)];
+      // 見つからないレースは0で作る
+      const out = [masterLabel];
+      for (let i = 0; i < people.length; i++) out.push(0);
+      return out;
     });
-
-    // 合計行が来た場合は最後に
-    if (totalRow) {
-      const copied = totalRow.slice();
-      copied[0] = "合計";
-      rows.push(copied);
-    }
 
     return { headers, rows };
   }
 
+  // ★tableをiPhoneで横スクロール無しに近づける：必要ならscaleで縮小
+  function applyMobileScaleForTable(designWidth) {
+    const dom = document.getElementById("profitTable");
+    const wrap = document.getElementById("profitTableWrap");
+    const avail = wrap?.clientWidth || window.innerWidth;
+    const safeAvail = Math.max(260, avail - 8);
+
+    if (isMobile() && designWidth > safeAvail) {
+      const s = Math.max(0.72, Math.min(1, safeAvail / designWidth));
+      dom.style.transform = `scale(${s})`;
+      dom.style.width = `${designWidth}px`;
+    } else {
+      dom.style.transform = "scale(1)";
+      dom.style.width = "100%";
+    }
+  }
+
+  // ★optionを返す（designWidthも返す：scale計算用）
   function buildProfitTableOption(profitTableRaw) {
     const rebuilt = rebuildProfitRowsByMaster(profitTableRaw);
     const headers = rebuilt.headers;
     const rows = rebuilt.rows;
 
-    if (headers.length < 2 || rows.length === 0) return null;
+    if (headers.length < 2 || rows.length === 0) {
+      return { option: null, designWidth: 600 };
+    }
 
     const people = headers.slice(1);
     const races  = rows.map(r => String(r[0] ?? ""));
@@ -701,29 +708,23 @@ function normalizeRaceKey(s) {
     const absMax = Math.max(Math.abs(min), Math.abs(max)) || 1;
     const mobile = isMobile();
 
-    // ★iPhoneで横スクロールさせない設計：
-    // - 左幅は「固定ピクセル」ではなく、比率＋containLabelで収める
-    // - ラベルはトリムして収める（見切れゼロ）
-    const gridLeft = mobile ? 118 : 170;  // ここを詰める（見切れは下のwidth/overflowで防ぐ）
+    // ★ギリギリまで詰める（スマホは特に）
+    const leftW = mobile ? 118 : 170;
+    const colW  = mobile ? 72  : 112;
+    const designWidth = leftW + colW * people.length + (mobile ? 16 : 20);
+
     const cellH = mobile ? 22 : 24;
 
-    const fontName = mobile ? 11 : 12;
-    const fontRace = mobile ? 10 : 11;
-    const fontCell = mobile ? 10 : 11;
-
-    // ★列幅ギリギリ：上の名前は短いので詰めてOK
-    // （EChartsは自動で割り振るので、ここはフォントとgridで攻める）
-
-    return {
+    const option = {
       animation: false,
       backgroundColor: 'transparent',
 
       grid: {
         top: mobile ? 44 : 48,
-        left: gridLeft,
+        left: leftW,
         right: mobile ? 10 : 14,
         bottom: 10,
-        containLabel: true   // ★これが「見切れゼロ」の核
+        containLabel: true
       },
 
       xAxis: {
@@ -732,7 +733,7 @@ function normalizeRaceKey(s) {
         position: 'top',
         axisLabel: {
           color:'rgba(233,238,252,.95)',
-          fontSize: fontName,
+          fontSize: mobile ? 11 : 12,
           fontWeight: 800,
           interval: 0,
           padding: [0, 0, 8, 0]
@@ -743,14 +744,14 @@ function normalizeRaceKey(s) {
 
       yAxis: {
         type: 'category',
-        data: races,         // ★日付なし＆省略名
-        inverse: true,       // 上からフェブラリーS
+        data: races,
+        inverse: true, // ★上がフェブラリーS
         axisLabel: {
           color:'rgba(233,238,252,.80)',
-          fontSize: fontRace,
+          fontSize: mobile ? 10 : 11,
           margin: 10,
-          width: gridLeft - 18,     // ★ラベル領域を明示
-          overflow: 'truncate',     // ★長いのは省略表示（見切れゼロ）
+          width: leftW - 16,
+          overflow: 'truncate',
           ellipsis: '…',
           lineHeight: mobile ? 14 : 16
         },
@@ -764,7 +765,9 @@ function normalizeRaceKey(s) {
         max: absMax,
         show: false,
         calculable: false,
-        inRange: { color: ['#ff6b6b', '#141a2a', '#7aa2ff'] }
+        inRange: {
+          color: ['#ff6b6b', '#141a2a', '#7aa2ff']
+        }
       },
 
       tooltip: {
@@ -804,7 +807,6 @@ function normalizeRaceKey(s) {
 
           const sign = val > 0 ? '+' : '';
           const text = `${sign}${fmtJPY(val)}`;
-
           const txt = Math.abs(val) > absMax * 0.55 ? 'rgba(255,255,255,.92)' : 'rgba(233,238,252,.88)';
 
           return {
@@ -826,8 +828,8 @@ function normalizeRaceKey(s) {
                   y: rect.y + rect.height/2,
                   text,
                   fill: txt,
-                  fontSize: fontCell,
-                  fontWeight: 600,
+                  fontSize: mobile ? 10 : 11,
+                  fontWeight: 700,
                   align: 'center',
                   verticalAlign: 'middle'
                 }
@@ -837,6 +839,8 @@ function normalizeRaceKey(s) {
         }
       }]
     };
+
+    return { option, designWidth };
   }
 
   function makeProfitTable() {
@@ -846,27 +850,28 @@ function normalizeRaceKey(s) {
     return {
       chart,
       set: (profitTable) => {
-        const option = buildProfitTableOption(profitTable);
+        const { option, designWidth } = buildProfitTableOption(profitTable);
 
-        // ★横幅を広げない（iPhoneでもスクロールさせない）
-        dom.style.width = "100%";
+        // ★iPhoneは必要なら縮小して横スクロールを極小化
+        applyMobileScaleForTable(designWidth);
 
         if (!option) {
           chart.clear();
           chart.setOption({
             title: { text: '収支データがありません', left: 'center', top: 'middle',
               textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
-          });
-          chart.resize();
+          }, true);
+          requestAnimationFrame(() => chart.resize());
           return;
         }
 
         chart.setOption(option, true);
-        chart.resize(); // ★描画直後に確実にリサイズ
+
+        // ★表示直後にresize（iPhoneでのズレ対策）
+        requestAnimationFrame(() => chart.resize());
       }
     };
   }
-
 
   // ========= 描画制御 =========
   let dashCharts = [];
@@ -916,7 +921,15 @@ function normalizeRaceKey(s) {
     resizeBound = true;
     window.addEventListener("resize", () => {
       dashCharts.forEach(c => c?.resize?.());
-      tableChartWrap?.chart?.resize?.();
+
+      // ★iPhoneの回転・幅変化でscale再計算
+      if (tableChartWrap?.chart) {
+        try {
+          const opt = tableChartWrap.chart.getOption();
+          // 再描画トリガだけ入れる（setOptionし直しは不要）
+          requestAnimationFrame(() => tableChartWrap.chart.resize());
+        } catch {}
+      }
     });
   }
 
@@ -941,17 +954,17 @@ function normalizeRaceKey(s) {
   });
 
   loadFormState();
-  prefetchAllData(); // setTimeout じゃなく即
 
+  // ★起動直後に先読み（体感を速く）
+  prefetchAllData();
 
+  // ====== 初期タブ復元（保存タブがdashboard/tableでも自動描画） ======
   const savedTab = localStorage.getItem("waku_g1_active_tab");
-
-  // まずタブだけ切り替える
-  if (savedTab === "dashboard" || savedTab === "table" || savedTab === "history") {
+  if (knowTab(savedTab)) {
     setTab(savedTab);
   }
 
-  // ★表示が確定してから最速で描画（display:none問題を回避）
+  // ★表示確定後に描画（display:none問題回避）
   requestAnimationFrame(async () => {
     try {
       if (savedTab === "dashboard") await renderDashboard();
@@ -961,30 +974,29 @@ function normalizeRaceKey(s) {
     }
   });
 
-
-
+  // ====== タブクリック（表示確定後に描画） ======
   document.querySelectorAll(".tabbtn").forEach(btn => {
     btn.addEventListener("click", () => {
       const t = btn.dataset.tab;
       setTab(t);
 
-    // ★表示が確定してから描画（最速＆安定）
       requestAnimationFrame(async () => {
         try {
           if (t === "dashboard") await renderDashboard();
           if (t === "table") await renderTable();
         } catch (e) {
           alert("取得エラー: " + e.message);
-      }
+        }
+      });
     });
   });
-});
 
-
-  document.getElementById("toDash").addEventListener("click", async () => {
+  document.getElementById("toDash").addEventListener("click", () => {
     setTab("dashboard");
-    try { await renderDashboard(); }
-    catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
+    requestAnimationFrame(async () => {
+      try { await renderDashboard(); }
+      catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
+    });
   });
 
   document.getElementById("toInputFromDash").addEventListener("click", () => setTab("input"));
