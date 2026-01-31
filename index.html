@@ -114,13 +114,13 @@
     .chart{width:100%; height:320px;}
     .chartTall{width:100%; height:360px;}
 
-    /* ★収支表（ECharts表） */
+    /* 収支表タブ */
     .tableWrap{
       overflow-x:auto;
       -webkit-overflow-scrolling:touch;
       border-radius:12px;
     }
-    .chartTable{height:560px;} /* 行数多めなので少し高く */
+    .chartTable{height:560px;}
 
     @media (max-width: 900px){
       .form{grid-template-columns: 1fr;}
@@ -160,6 +160,7 @@
   <div class="tabs">
     <button class="tabbtn active" data-tab="input">入力</button>
     <button class="tabbtn" data-tab="dashboard">ダッシュボード</button>
+    <button class="tabbtn" data-tab="table">収支表</button>
     <button class="tabbtn" data-tab="history">History</button>
   </div>
 </header>
@@ -210,10 +211,10 @@
   <!-- DASHBOARD -->
   <section id="tab-dashboard" class="hidden">
     <div class="row" style="justify-content:space-between; margin: 0 0 10px 0;">
-      <span class="badge" id="updated">updated: -</span>
+      <span class="badge" id="updatedDash">updated: -</span>
       <div class="row">
-        <button class="btn" id="reloadBtn" type="button">再読み込み</button>
-        <button class="btn" id="toInput" type="button">入力へ</button>
+        <button class="btn" id="reloadDashBtn" type="button">再読み込み</button>
+        <button class="btn" id="toInputFromDash" type="button">入力へ</button>
       </div>
     </div>
 
@@ -225,16 +226,23 @@
       <div class="card c4"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
       <div class="card c5"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積収支 [円] <span class="hint">0ライン</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
       <div class="card c6"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
+    </div>
+  </section>
 
-      <!-- ★追加：収支表（ECharts 表） -->
-      <div class="card" style="grid-column: span 12;">
-        <div class="row" style="justify-content:space-between; margin:0 0 6px;">
-          <h2 style="margin:0; color:var(--muted); font-size:13px;">収支表（ヒートマップ）</h2>
-          <span class="hint">横スクロールOK / 最終行は合計として強調</span>
-        </div>
-        <div id="profitTableWrap" class="tableWrap">
-          <div id="profitTable" class="chartTable"></div>
-        </div>
+  <!-- TABLE -->
+  <section id="tab-table" class="hidden">
+    <div class="row" style="justify-content:space-between; margin: 0 0 10px 0;">
+      <span class="badge" id="updatedTable">updated: -</span>
+      <div class="row">
+        <button class="btn" id="reloadTableBtn" type="button">再読み込み</button>
+        <button class="btn" id="toInputFromTable" type="button">入力へ</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">収支表（ヒートマップ）</h2>
+      <div id="profitTableWrap" class="tableWrap">
+        <div id="profitTable" class="chartTable"></div>
       </div>
     </div>
   </section>
@@ -247,7 +255,7 @@
       <div class="row" style="gap:12px;">
         <a class="linkcard" href="https://waku4431.github.io/wakuwaku_G1/" target="_blank" rel="noopener">
           <div class="linktitle">2025（去年のサイト）</div>
-          <div class="linkurl">https://waku4431.github.io/wakuwaku_G1/</div>
+          <div class="linkurl">https://waku4431.github.io/wakuwakuu_G1/</div>
         </a>
 
         <a class="linkcard" href="https://docs.google.com/spreadsheets/d/1V1nxbAoVL6SjKAgII8QPmEYw8A5YI-tZUzYFDhKDx1Y/edit?gid=614154890#gid=614154890" target="_blank" rel="noopener">
@@ -401,9 +409,10 @@
     });
     document.getElementById("tab-input").classList.toggle("hidden", tabName !== "input");
     document.getElementById("tab-dashboard").classList.toggle("hidden", tabName !== "dashboard");
+    document.getElementById("tab-table").classList.toggle("hidden", tabName !== "table");
     document.getElementById("tab-history").classList.toggle("hidden", tabName !== "history");
     localStorage.setItem("waku_g1_active_tab", tabName);
-    if (tabName !== "dashboard") prefetchAllData();
+    if (tabName !== "dashboard" && tabName !== "table") prefetchAllData();
   }
 
   // ========= POST =========
@@ -419,7 +428,7 @@
     return text;
   }
 
-  // ========= ECharts共通 =========
+  // ========= ECharts =========
   const fmtJPY = (v) => new Intl.NumberFormat('ja-JP').format(v ?? 0);
   const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
@@ -427,7 +436,7 @@
     try { chart?.dispose?.(); } catch {}
   }
 
-  // ★余白最適化
+  // ★余白最適化（左と下をさらに詰める）
   function getChartLayout() {
     const mobile = isMobile();
     return {
@@ -502,12 +511,13 @@
     return chart;
   }
 
+  // ★折れ線：横軸は「レース回数」
   function makeLines(el, block, isPct=false, showZero=false) {
     const chart = echarts.init(document.getElementById(el));
     const L = getChartLayout();
 
     const dates = block?.dates ?? [];
-    const xLabels = dates.map((_, i) => String(i + 1));
+    const xLabels = dates.map((_, i) => String(i + 1)); // 1..N
 
     const legends = block?.series ? Object.keys(block.series) : [];
     const series = legends.map(name => ({
@@ -597,10 +607,53 @@
     return chart;
   }
 
-  // ========= ★追加：profitTable（ECharts表） =========
-  function buildProfitTableOption(profitTable) {
+  // ========= 収支表（ヒートマップ） =========
+  // RACESマスタ順で並べるための正規化
+  const normalizeRace = (s) => {
+    if (!s) return "";
+    let t = String(s).trim();
+    t = t.replace(/^[【\[]/, "").replace(/[】\]]$/, "");  // 先頭末尾の括弧っぽいの
+    t = t.replace(/【/g, "").replace(/】/g, "");         // 中の【】も除去
+    t = t.replace(/（.*?）/g, "");                       // かっこ日付を除去
+    t = t.replace(/\s+/g, "");
+    return t;
+  };
+
+  const RACE_ORDER = (() => {
+    const m = new Map();
+    RACES.forEach((s, i) => {
+      const base = normalizeRace(s);
+      if (base) m.set(base, i);
+    });
+    return m;
+  })();
+
+  function sortProfitRowsByMaster(profitTable) {
+    const headers = profitTable?.headers ?? [];
+    const rows = (profitTable?.rows ?? []).slice();
+    if (rows.length <= 1) return profitTable;
+
+    // 合計行は「最後の行」として扱う（強調したい前提）
+    const totalRow = rows.pop();
+
+    const sorted = rows.sort((a, b) => {
+      const an = normalizeRace(a?.[0]);
+      const bn = normalizeRace(b?.[0]);
+      const ai = RACE_ORDER.has(an) ? RACE_ORDER.get(an) : 9999;
+      const bi = RACE_ORDER.has(bn) ? RACE_ORDER.get(bn) : 9999;
+      if (ai !== bi) return ai - bi;
+      return an.localeCompare(bn, "ja");
+    });
+
+    sorted.push(totalRow);
+    return { headers, rows: sorted };
+  }
+
+  function buildProfitTableOption(profitTableRaw) {
+    const profitTable = sortProfitRowsByMaster(profitTableRaw);
     const headers = profitTable?.headers ?? [];
     const rows = profitTable?.rows ?? [];
+
     if (headers.length < 2 || rows.length === 0) {
       return { option: null, chartWidth: 600 };
     }
@@ -626,12 +679,10 @@
 
     const absMax = Math.max(Math.abs(min), Math.abs(max)) || 1;
 
-    // 列数に応じて横幅を伸ばす（横スクロール前提）
     const colW = isMobile() ? 96 : 112;
     const leftW = isMobile() ? 120 : 160;
     const chartWidth = leftW + people.length * colW + 30;
 
-    // 行高（多すぎると読めないので少し厚め）
     const cellH = isMobile() ? 24 : 26;
 
     const option = {
@@ -670,12 +721,11 @@
         axisTick: { show: false }
       },
 
-      // 0中心の赤↔白↔青
       visualMap: {
         type: 'continuous',
         min: -absMax,
         max: absMax,
-        show: false,       // 表の俯瞰優先（必要ならtrueに）
+        show: false,
         calculable: false,
         inRange: {
           color: ['#ff6b6b', '#141a2a', '#7aa2ff'] // 赤→暗め→青
@@ -699,7 +749,6 @@
       series: [{
         type: 'custom',
         data,
-
         renderItem: (params, api) => {
           const x = api.value(0);
           const y = api.value(1);
@@ -707,11 +756,9 @@
 
           const isTotal = (y === totalRowIndex);
 
-          // セル中心座標とサイズ
           const point = api.coord([x, y]);
           const size = api.size([1, 1]);
 
-          // 行高を固定寄りに（見やすさ優先）
           const w = size[0];
           const h = Math.max(cellH, size[1]);
 
@@ -725,11 +772,9 @@
           const sign = val > 0 ? '+' : '';
           const text = `${sign}${fmtJPY(val)}`;
 
-          // 合計行：枠太く + 文字太く
           const stroke = isTotal ? 'rgba(233,238,252,.75)' : 'rgba(255,255,255,.10)';
           const lw = isTotal ? 2 : 1;
 
-          // 文字色：背景が濃いとき白寄りに（簡易）
           const txt = Math.abs(val) > absMax * 0.55 ? 'rgba(255,255,255,.92)' : 'rgba(233,238,252,.88)';
 
           return {
@@ -766,62 +811,80 @@
     return { option, chartWidth };
   }
 
-  function makeProfitTable(el, wrapEl, profitTable) {
-    const dom = document.getElementById(el);
-    const wrap = document.getElementById(wrapEl);
-
+  function makeProfitTable() {
+    const dom = document.getElementById("profitTable");
     const chart = echarts.init(dom);
-    const { option, chartWidth } = buildProfitTableOption(profitTable);
 
-    // 横幅を伸ばして横スクロール
-    dom.style.width = `${chartWidth}px`;
-    chart.resize();
+    return {
+      chart,
+      set: (profitTable) => {
+        const { option, chartWidth } = buildProfitTableOption(profitTable);
+        dom.style.width = `${chartWidth}px`;
+        chart.resize();
 
-    if (!option) {
-      chart.clear();
-      chart.setOption({
-        title: { text: '収支データがありません', left: 'center', top: 'middle', textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
-      });
-      return chart;
-    }
-
-    chart.setOption(option);
-    return chart;
+        if (!option) {
+          chart.clear();
+          chart.setOption({
+            title: { text: '収支データがありません', left: 'center', top: 'middle',
+              textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
+          });
+          return;
+        }
+        chart.setOption(option);
+      }
+    };
   }
 
   // ========= 描画制御 =========
-  let charts = [];
+  let dashCharts = [];
+  let tableChartWrap = null;
   let resizeBound = false;
 
   async function renderDashboard() {
-    charts.forEach(c => safeDispose(c));
-    charts = [];
+    dashCharts.forEach(c => safeDispose(c));
+    dashCharts = [];
 
-    const updated = document.getElementById("updated");
+    const updated = document.getElementById("updatedDash");
+    updated.textContent = "updated: loading...";
+
+    const data = await getAllDataFast();
+    const participants = data.summary.map(d => d.participant);
+
+    dashCharts.push(makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false));
+    dashCharts.push(makeBar("barProfit", "収支", participants, data.summary.map(d=>Number(d.profit_total??0)), false));
+    dashCharts.push(makeBar("barRoi", "回収率", participants, data.summary.map(d=>Number(d.roi??0)), true));
+
+    dashCharts.push(makeLines("lineCumBet", data.cumBet, false, false));
+    dashCharts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
+    dashCharts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
+
+    updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
+
+    if (!resizeBound) bindResize();
+  }
+
+  async function renderTable() {
+    const updated = document.getElementById("updatedTable");
     updated.textContent = "updated: loading...";
 
     const data = await getAllDataFast();
 
-    const participants = data.summary.map(d => d.participant);
-    charts.push(makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false));
-    charts.push(makeBar("barProfit", "収支", participants, data.summary.map(d=>Number(d.profit_total??0)), false));
-    charts.push(makeBar("barRoi", "回収率", participants, data.summary.map(d=>Number(d.roi??0)), true));
-
-    charts.push(makeLines("lineCumBet", data.cumBet, false, false));
-    charts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
-    charts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
-
-    // ★追加：収支表
-    if (data.profitTable) {
-      charts.push(makeProfitTable("profitTable", "profitTableWrap", data.profitTable));
+    if (!tableChartWrap) {
+      tableChartWrap = makeProfitTable();
     }
+    tableChartWrap.set(data.profitTable);
 
     updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
-    if (!resizeBound) {
-      resizeBound = true;
-      window.addEventListener("resize", () => charts.forEach(c => c?.resize?.()));
-    }
+    if (!resizeBound) bindResize();
+  }
+
+  function bindResize() {
+    resizeBound = true;
+    window.addEventListener("resize", () => {
+      dashCharts.forEach(c => c?.resize?.());
+      tableChartWrap?.chart?.resize?.();
+    });
   }
 
   // ========= セレクト =========
@@ -845,19 +908,21 @@
   });
 
   loadFormState();
-
   setTimeout(prefetchAllData, 0);
 
   const savedTab = localStorage.getItem("waku_g1_active_tab");
-  if (savedTab === "dashboard" || savedTab === "history") setTab(savedTab);
+  if (savedTab === "dashboard" || savedTab === "table" || savedTab === "history") setTab(savedTab);
 
   document.querySelectorAll(".tabbtn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const t = btn.dataset.tab;
       setTab(t);
-      if (t === "dashboard") {
-        try { await renderDashboard(); }
-        catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
+
+      try {
+        if (t === "dashboard") await renderDashboard();
+        if (t === "table") await renderTable();
+      } catch (e) {
+        alert("取得エラー: " + e.message);
       }
     });
   });
@@ -868,12 +933,22 @@
     catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
   });
 
-  document.getElementById("toInput").addEventListener("click", () => setTab("input"));
+  document.getElementById("toInputFromDash").addEventListener("click", () => setTab("input"));
+  document.getElementById("toInputFromTable").addEventListener("click", () => setTab("input"));
 
-  document.getElementById("reloadBtn").addEventListener("click", async () => {
+  document.getElementById("reloadDashBtn").addEventListener("click", async () => {
     try {
       cachedAllDataAt = 0;
       await renderDashboard();
+    } catch (e) {
+      alert("再読み込みエラー: " + e.message);
+    }
+  });
+
+  document.getElementById("reloadTableBtn").addEventListener("click", async () => {
+    try {
+      cachedAllDataAt = 0;
+      await renderTable();
     } catch (e) {
       alert("再読み込みエラー: " + e.message);
     }
