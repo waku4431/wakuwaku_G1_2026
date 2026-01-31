@@ -645,10 +645,12 @@
 
   // ========= 収支表（ヒートマップ） =========
 
-  // ★シート上のレース名（揺れ）→表示用省略名へ寄せる
-  // 例: "フェブラリーS（2月22日）" / "フェブラリーS" / "フェブラリーステークス" / "東京優駿（日本ダービー）" etc
+  // ★重要修正：
+  // 以前の normalize は /（.*?）/ を消してしまい
+  // 天皇賞（春）と天皇賞（秋）がどちらも「天皇賞」になって衝突 → 片方が潰れる
+  // → 日付括弧（◯月◯日を含む括弧）だけ除去する
   const normalize = (s) => String(s ?? "")
-    .replace(/（.*?）/g, "")   // かっこの日付など除去
+    .replace(/（[^）]*\d+月\d+日[^）]*）/g, "")  // 日付括弧だけ除去
     .replace(/\s+/g, "")
     .trim();
 
@@ -658,7 +660,7 @@
     // 基本（表示名→表示名）
     TABLE_RACES.forEach(r => m.set(normalize(r), r));
 
-    // よくある揺れを追加（必要に応じて増やせる）
+    // よくある揺れ（必要に応じて増やせる）
     m.set(normalize("フェブラリーステークス"), "フェブラリーS");
     m.set(normalize("スプリンターズステークス"), "スプリンターズS");
     m.set(normalize("朝日杯フューチュリティステークス"), "朝日杯フューチュリティS");
@@ -667,6 +669,10 @@
     m.set(normalize("日本ダービー"), "東京優駿（日本ダービー）");
     m.set(normalize("東京優駿"), "東京優駿（日本ダービー）");
     m.set(normalize("優駿牝馬"), "優駿牝馬（オークス）");
+
+    // 念のため（GAS側が括弧なし表記でも拾う）
+    m.set(normalize("天皇賞春"), "天皇賞（春）");
+    m.set(normalize("天皇賞秋"), "天皇賞（秋）");
 
     return m;
   })();
@@ -735,7 +741,6 @@
     const mobile = isMobile();
 
     // ★iPhoneで横スクロールなしで「収める」前提のレイアウト
-    // leftは詰める / 列はやや広げる / 右余白を減らす
     const leftW = mobile ? 96 : 160;
     const gridRight = mobile ? 4 : 16;
 
@@ -745,17 +750,20 @@
       animation: false,
       backgroundColor: 'transparent',
 
+      // ★名前（参加者）を上に出すので top を増やす
       grid: {
-        top: 36,
+        top: mobile ? 54 : 58,
         left: leftW,
         right: gridRight,
         bottom: 10,
         containLabel: false
       },
 
+      // ★参加者名を「表の一番上」に出す（見た目: ヘッダ行）
       xAxis: {
         type: 'category',
         data: people,
+        position: 'top',
         axisLabel: {
           color:'rgba(233,238,252,.98)',
           fontSize: mobile ? 13 : 12,
@@ -767,9 +775,11 @@
         axisTick: { alignWithLabel: true }
       },
 
+      // ★時系列の逆転を起こさないよう固定
       yAxis: {
         type: 'category',
         data: races,
+        inverse: false,
         axisLabel: {
           color:'rgba(233,238,252,.86)',
           fontSize: mobile ? 11 : 11,
@@ -850,7 +860,7 @@
                   y: rect.y + rect.height/2,
                   text,
                   fill: txt,
-                  fontSize: mobile ? 10 : 11,  // ★セル内数字を1つ小さく
+                  fontSize: mobile ? 10 : 11,
                   fontWeight: 700,
                   align: 'center',
                   verticalAlign: 'middle'
@@ -937,7 +947,7 @@
       tableChartWrap = makeProfitTable();
     }
 
-    // ★init直後にresizeを噛ませる（iPhoneで0幅判定になるのを防ぐ）
+    // ★init直後にresize（iPhoneで0幅判定になるのを防ぐ）
     tableChartWrap.chart.resize();
 
     tableChartWrap.set(data.profitTable);
