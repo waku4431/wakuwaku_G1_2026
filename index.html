@@ -31,7 +31,6 @@
       display:flex; flex-direction:column; gap:10px;
     }
     h1{margin:0; font-size:20px; letter-spacing:.2px}
-    .sub{color:var(--muted); font-size:12px}
 
     .tabs{
       display:flex;
@@ -106,7 +105,6 @@
       color: var(--muted);
       font-size:12px;
     }
-    .badge.danger{color:var(--danger); border-color: rgba(255,107,107,.5);}
 
     /* Dashboard layout */
     .grid{
@@ -131,7 +129,6 @@
 
     .hidden{display:none !important;}
     .hint{font-size:12px; color:rgba(233,238,252,.65);}
-    .ok{color:#9be39b;}
 
     /* History link cards */
     a.linkcard{
@@ -165,14 +162,12 @@
 <header>
   <div>
     <h1>わくわくG1サイト 2026</h1>
-    <!-- サブ説明は不要なので削除 -->
   </div>
 
   <div class="tabs">
     <button class="tabbtn active" data-tab="input">入力</button>
     <button class="tabbtn" data-tab="dashboard">ダッシュボード</button>
     <button class="tabbtn" data-tab="history">History</button>
-    <!-- readyバッジは不要なので削除 -->
   </div>
 </header>
 
@@ -297,6 +292,32 @@
     "有馬記念（12月27日）"
   ];
 
+  // ========= 画面幅でモバイル判定 =========
+  const isMobile = () => window.innerWidth <= 420; // iPhone想定
+
+  // ========= 色（参加者ごとに固定） =========
+  // 棒グラフも折れ線も「同じ参加者=同じ色」になる
+  const COLOR_MAP = {
+    "わくだ":   "#7aa2ff",
+    "きよもと": "#ffd166",
+    "せきざわ": "#ff6b6b",
+    "たきざわ": "#6ee7b7",
+    "粗品":     "#a78bfa",
+  };
+  const getColor = (name) => COLOR_MAP[name] || "#7aa2ff";
+
+  // ========= 日付 -> レース名（RACESから生成） =========
+  const RACE_BY_DATE = (() => {
+    const map = {};
+    for (const s of RACES) {
+      // 例: "スプリンターズステークス（9月27日）"
+      const m = s.match(/^(.+?)（(.+?)）$/);
+      if (m) map[m[2]] = m[1]; // key="9月27日", value="スプリンターズステークス"
+    }
+    return map;
+  })();
+  const getRaceNameByDate = (d) => RACE_BY_DATE[d] || "";
+
   // ========= 入力保持（localStorage） =========
   const LS_KEY = "waku_g1_form_state_v1";
 
@@ -370,15 +391,52 @@
   const fmtJPY = (v) => new Intl.NumberFormat('ja-JP').format(v ?? 0);
   const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
+  // 共通：余白とフォント（スマホで縦軸が欠けないように）
+  function getChartLayout() {
+    const mobile = isMobile();
+    return {
+      mobile,
+      gridLeft: mobile ? 76 : 56,    // ★iPhoneでも6桁が欠けにくい
+      gridRight: 18,
+      fontAxis: mobile ? 11 : 12,
+      fontLegend: mobile ? 11 : 12,
+      axisMargin: mobile ? 10 : 8,
+      rotateX: 35
+    };
+  }
+
+  // ★棒グラフ：参加者ごとの色を固定
   function makeBar(el, title, participants, values, isPct=false) {
     const chart = echarts.init(document.getElementById(el));
+    const L = getChartLayout();
+
     chart.setOption({
       backgroundColor:'transparent',
-      grid:{ left:50, right:18, top:20, bottom:45 },
-      xAxis:{ type:'category', data:participants, axisLabel:{ color:'rgba(233,238,252,.85)', rotate:35 } },
+      grid:{
+        left: L.gridLeft,
+        right: L.gridRight,
+        top: 20,
+        bottom: 48,
+        containLabel: true // ★これがあるとラベルの欠けに強い
+      },
+      xAxis:{
+        type:'category',
+        data:participants,
+        axisLabel:{
+          color:'rgba(233,238,252,.85)',
+          rotate: L.rotateX,
+          fontSize: L.fontAxis,
+          margin: L.axisMargin
+        }
+      },
       yAxis:{
         type:'value',
-        axisLabel:{ color:'rgba(233,238,252,.65)', formatter:(v)=> isPct?`${v}%`:fmtJPY(v) },
+        axisLabel:{
+          color:'rgba(233,238,252,.65)',
+          formatter:(v)=> isPct?`${v}%`:fmtJPY(v),
+          fontSize: L.fontAxis,
+          margin: L.axisMargin
+        },
         splitLine:{ lineStyle:{ color:'rgba(255,255,255,.08)' } }
       },
       tooltip:{
@@ -393,11 +451,15 @@
         type:'bar',
         data:values,
         barMaxWidth:42,
-        itemStyle:{ borderRadius:[10,10,0,0] },
+        itemStyle:{
+          color: (params) => getColor(params.name),
+          borderRadius:[10,10,0,0]
+        },
         label:{
           show:true,
           position:'insideTop',
           color:'rgba(233,238,252,.95)',
+          fontSize: L.mobile ? 11 : 12,
           formatter:(p)=> {
             const v=Number(p.value??0);
             return isPct?`${v.toFixed(0)}%`:`¥${fmtJPY(v)}`;
@@ -408,39 +470,76 @@
     return chart;
   }
 
+  // ★折れ線：直線（smooth:false） + 色固定 + ツールチップに「日付 + レース名」
   function makeLines(el, block, isPct=false, showZero=false) {
     const chart = echarts.init(document.getElementById(el));
+    const L = getChartLayout();
+
     const dates = block?.dates ?? [];
     const legends = block?.series ? Object.keys(block.series) : [];
+
     const series = legends.map(name => ({
-      name, type:'line',
+      name,
+      type:'line',
       data:block.series[name],
-      smooth:true, showSymbol:false,
-      lineStyle:{ width:2 },
+      smooth:false,          // ★直線
+      showSymbol:false,
+      lineStyle:{ width:2, color:getColor(name) },
       emphasis:{ focus:'series' }
     }));
+
     const opt = {
       backgroundColor:'transparent',
-      legend:{ data:legends, top:0, textStyle:{ color:'rgba(233,238,252,.75)' } },
-      grid:{ left:52, right:18, top:28, bottom:42 },
-      xAxis:{ type:'category', data:dates, axisLabel:{ color:'rgba(233,238,252,.75)', rotate:35 } },
+      legend:{
+        data:legends,
+        top:0,
+        textStyle:{ color:'rgba(233,238,252,.75)', fontSize: L.fontLegend }
+      },
+      grid:{
+        left: L.gridLeft,
+        right: L.gridRight,
+        top: 30,
+        bottom: 44,
+        containLabel: true     // ★ラベル欠け対策
+      },
+      xAxis:{
+        type:'category',
+        data:dates,
+        axisLabel:{
+          color:'rgba(233,238,252,.75)',
+          rotate: L.rotateX,
+          fontSize: L.fontAxis,
+          margin: L.axisMargin
+        }
+      },
       yAxis:{
         type:'value',
-        axisLabel:{ color:'rgba(233,238,252,.65)', formatter:(v)=> isPct?`${v}%`:fmtJPY(v) },
+        axisLabel:{
+          color:'rgba(233,238,252,.65)',
+          formatter:(v)=> isPct?`${v}%`:fmtJPY(v),
+          fontSize: L.fontAxis,
+          margin: L.axisMargin
+        },
         splitLine:{ lineStyle:{ color:'rgba(255,255,255,.08)' } }
       },
       tooltip:{
         trigger:'axis',
         formatter:(params)=> {
+          const d = params[0].axisValue;
+          const raceName = getRaceNameByDate(d);
+          const head = raceName ? `${d}　${raceName}` : d;
+
           const lines=params.map(p=>{
             const v=Number(p.value??0);
             return `${p.marker} ${p.seriesName}: <b>${isPct?fmtPct(v):"¥"+fmtJPY(v)}</b>`;
           }).join("<br>");
-          return `${params[0].axisValue}<br>${lines}`;
+
+          return `${head}<br>${lines}`;
         }
       },
       series
     };
+
     if (showZero) {
       opt.series.forEach(s => s.markLine = {
         symbol:'none',
@@ -448,11 +547,14 @@
         data:[{ yAxis:0 }]
       });
     }
+
     chart.setOption(opt);
     return chart;
   }
 
   let charts = [];
+  let resizeBound = false;
+
   async function renderDashboard() {
     // 旧チャートを破棄（再読み込み対策）
     charts.forEach(c => c?.dispose?.());
@@ -474,7 +576,24 @@
 
     updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
-    window.addEventListener("resize", () => charts.forEach(c => c.resize()));
+    // resizeイベントは多重登録しない
+    if (!resizeBound) {
+      resizeBound = true;
+      let timer = null;
+      window.addEventListener("resize", () => {
+        // 連打対策（軽いデバウンス）
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          // サイズ変更で余白/フォントが変わる可能性があるので再描画が確実
+          // データ量が軽いのでOK
+          if (localStorage.getItem("waku_g1_active_tab") === "dashboard") {
+            renderDashboard().catch(()=>{});
+          } else {
+            charts.forEach(c => c.resize());
+          }
+        }, 150);
+      });
+    }
   }
 
   // ========= 初期化 =========
@@ -556,10 +675,6 @@
 
       // 状態保存（次回も保持）
       saveFormState();
-
-      // 送信完了の軽い通知
-      // alertを使いたくなければ消してOK
-      // alert("送信しました");
 
     } catch (e) {
       alert(e.message);
