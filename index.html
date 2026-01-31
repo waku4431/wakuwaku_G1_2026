@@ -1,46 +1,177 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>wakuwaku G1 2026</title>
+  <style>
+    :root { --bg:#f6f7fb; --card:#fff; --text:#111; --muted:#666; --border:#ddd; }
+    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+    .container { max-width: 720px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 22px; margin: 8px 0 14px; }
+    .card { background:var(--card); border-radius: 14px; padding: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+    .form { display:grid; gap: 12px; }
+    label { display:grid; gap: 6px; font-size: 14px; }
+    input, select {
+      padding: 12px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 16px;
+      background:#fff;
+    }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+    button {
+      padding: 12px 14px;
+      border: 0;
+      border-radius: 12px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .status { margin: 6px 0 0; font-size: 13px; color: var(--muted); min-height: 1.2em; }
+    .hint { font-size: 12px; color: var(--muted); margin: 0; }
+  </style>
 </head>
-<body style="font-family:system-ui; padding:16px;">
-  <h1>wakuwaku G1 2026</h1>
 
-  <button id="send" style="font-size:18px; padding:12px 16px;">
-    送信テスト
-  </button>
+<body>
+  <main class="container">
+    <h1>wakuwaku G1 2026</h1>
 
-  <p id="msg"></p>
+    <section class="card">
+      <form id="entryForm" class="form">
+        <label>参加者
+          <select id="name" required></select>
+        </label>
+
+        <label>G1レース名
+          <select id="race" required></select>
+        </label>
+
+        <div class="row">
+          <label>掛け金（円）
+            <input id="bet" type="number" inputmode="numeric" min="0" step="100" placeholder="例：1000" required />
+          </label>
+
+          <label>回収額（円）
+            <input id="pay" type="number" inputmode="numeric" min="0" step="100" placeholder="例：0" required />
+          </label>
+        </div>
+
+        <p class="hint">※送信後は Entries に追加されます</p>
+
+        <button id="submitBtn" type="submit">送信</button>
+        <p id="status" class="status"></p>
+      </form>
+    </section>
+  </main>
 
   <script>
-    const GAS_URL =
-      "https://script.google.com/macros/s/AKfycbyuC8SPEjHIXXQC_UzyMGI8sNj7-4sniPOMtSJKohUITtNtcoX37xlyCT9-SL3sQM_F/exec";
+    // ====== あなたのGAS WebアプリURL ======
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyuC8SPEjHIXXQC_UzyMGI8sNj7-4sniPOMtSJKohUITtNtcoX37xlyCT9-SL3sQM_F/exec";
 
-    document.getElementById("send").addEventListener("click", async () => {
-      const msg = document.getElementById("msg");
-      msg.textContent = "送信中…";
+    // ====== Master（参加者/レース名） ======
+    const PARTICIPANTS = ["わくだ","きよもと","せきざわ","たきざわ","粗品"];
 
-      const body = new URLSearchParams({
-        name: "テスト参加者",
-        race: "テストG1",
-        bet: 1000,
-        pay: 2000
-      }).toString();
+    const RACES = [
+      "フェブラリーステークス（2月22日）",
+      "高松宮記念（3月29日）",
+      "大阪杯（4月5日）",
+      "桜花賞（4月12日）",
+      "中山グランドジャンプ（4月18日）",
+      "皐月賞（4月19日）",
+      "天皇賞（春）（5月3日）",
+      "NHKマイルカップ（5月10日）",
+      "ヴィクトリアマイル（5月17日）",
+      "オークス（5月24日）",
+      "日本ダービー（5月31日）",
+      "安田記念（6月7日）",
+      "宝塚記念（6月14日）",
+      "スプリンターズステークス（9月27日）",
+      "秋華賞（10月18日）",
+      "菊花賞（10月25日）",
+      "天皇賞（秋）（11月1日）",
+      "エリザベス女王杯（11月15日）",
+      "マイルチャンピオンシップ（11月22日）",
+      "ジャパンカップ（11月29日）",
+      "チャンピオンズカップ（12月6日）",
+      "阪神ジュベナイルフィリーズ（12月13日）",
+      "朝日杯フューチュリティステークス（12月20日）",
+      "中山大障害（12月26日）",
+      "ホープフルステークス（12月26日）",
+      "有馬記念（12月27日）"
+    ];
+
+    // ====== DOM ======
+    const form = document.getElementById("entryForm");
+    const statusEl = document.getElementById("status");
+    const submitBtn = document.getElementById("submitBtn");
+    const nameEl = document.getElementById("name");
+    const raceEl = document.getElementById("race");
+
+    // ====== Helpers ======
+    function yen(n){
+      const x = Number(n);
+      if (!Number.isFinite(x)) return "";
+      return x.toLocaleString("ja-JP");
+    }
+
+    function fillSelect(selectEl, items, placeholder) {
+      selectEl.innerHTML = "";
+      const ph = document.createElement("option");
+      ph.value = "";
+      ph.textContent = placeholder;
+      selectEl.appendChild(ph);
+
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item;
+        opt.textContent = item;
+        selectEl.appendChild(opt);
+      }
+    }
+
+    // ====== 初期化：プルダウン生成 ======
+    fillSelect(nameEl, PARTICIPANTS, "参加者を選択");
+    fillSelect(raceEl, RACES, "G1レースを選択");
+
+    // ====== 送信 ======
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+
+      const name = nameEl.value.trim();
+      const race = raceEl.value.trim();
+      const bet  = document.getElementById("bet").value;
+      const pay  = document.getElementById("pay").value;
+
+      if (!name || !race || bet === "" || pay === "") {
+        statusEl.textContent = "未入力の項目があります。";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      statusEl.textContent = "送信中…";
+
+      const body = new URLSearchParams({ name, race, bet, pay }).toString();
 
       try {
         await fetch(GAS_URL, {
           method: "POST",
           mode: "no-cors",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-          },
+          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
           body
         });
-        msg.textContent = "送信した！Entriesを確認してね";
+
+        statusEl.textContent = `送信OK：掛け金 ¥${yen(bet)} / 回収額 ¥${yen(pay)}`;
+        form.reset();
+
+        // reset すると select が先頭（プレースホルダ）に戻るので、残したければここを変える
+        // nameEl.value = name; // ← 参加者を保持したいならコメント外す
+
       } catch (e) {
-        msg.textContent = "送信失敗（URLやネットワーク確認）";
+        statusEl.textContent = "送信に失敗しました。ネットワークやURLを確認してください。";
+      } finally {
+        submitBtn.disabled = false;
       }
     });
   </script>
