@@ -57,7 +57,7 @@
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
       border:1px solid var(--border);
       border-radius:16px;
-      padding:12px;
+      padding:10px; /* ★余白を減らす */
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
       overflow:hidden;
     }
@@ -117,14 +117,16 @@
     .c4{grid-column: span 4;}
     .c5{grid-column: span 4;}
     .c6{grid-column: span 4;}
-    .chart{width:100%; height:280px;}
-    .chartTall{width:100%; height:320px;}
+
+    /* ★グラフを大きく */
+    .chart{width:100%; height:320px;}
+    .chartTall{width:100%; height:360px;}
 
     @media (max-width: 900px){
       .form{grid-template-columns: 1fr;}
       .c1,.c2,.c3,.c4,.c5,.c6{grid-column: span 12;}
-      .chart{height:260px;}
-      .chartTall{height:300px;}
+      .chart{height:300px;}
+      .chartTall{height:340px;}
     }
 
     .hidden{display:none !important;}
@@ -293,10 +295,9 @@
   ];
 
   // ========= 画面幅でモバイル判定 =========
-  const isMobile = () => window.innerWidth <= 420; // iPhone想定
+  const isMobile = () => window.innerWidth <= 420;
 
   // ========= 色（参加者ごとに固定） =========
-  // 棒グラフも折れ線も「同じ参加者=同じ色」になる
   const COLOR_MAP = {
     "わくだ":   "#7aa2ff",
     "きよもと": "#ffd166",
@@ -310,13 +311,51 @@
   const RACE_BY_DATE = (() => {
     const map = {};
     for (const s of RACES) {
-      // 例: "スプリンターズステークス（9月27日）"
       const m = s.match(/^(.+?)（(.+?)）$/);
       if (m) map[m[2]] = m[1]; // key="9月27日", value="スプリンターズステークス"
     }
     return map;
   })();
   const getRaceNameByDate = (d) => RACE_BY_DATE[d] || "";
+
+  // ========= Dashboard データ先読みキャッシュ（体感速度UP） =========
+  let cachedAllData = null;
+  let cachedAllDataAt = 0;
+  let prefetchPromise = null;
+  const CACHE_MS = 30 * 1000;
+
+  async function getAllDataFast() {
+    const now = Date.now();
+
+    if (cachedAllData && (now - cachedAllDataAt) < CACHE_MS) {
+      return cachedAllData;
+    }
+    if (prefetchPromise) {
+      const data = await prefetchPromise;
+      cachedAllData = data;
+      cachedAllDataAt = Date.now();
+      prefetchPromise = null;
+      return data;
+    }
+    prefetchPromise = loadData();
+    const data = await prefetchPromise;
+    cachedAllData = data;
+    cachedAllDataAt = Date.now();
+    prefetchPromise = null;
+    return data;
+  }
+
+  function prefetchAllData() {
+    if (!prefetchPromise && (!cachedAllData || (Date.now() - cachedAllDataAt) > CACHE_MS)) {
+      prefetchPromise = loadData()
+        .then(d => {
+          cachedAllData = d;
+          cachedAllDataAt = Date.now();
+          return d;
+        })
+        .finally(() => { prefetchPromise = null; });
+    }
+  }
 
   // ========= 入力保持（localStorage） =========
   const LS_KEY = "waku_g1_form_state_v1";
@@ -358,11 +397,15 @@
     document.getElementById("tab-dashboard").classList.toggle("hidden", tabName !== "dashboard");
     document.getElementById("tab-history").classList.toggle("hidden", tabName !== "history");
     localStorage.setItem("waku_g1_active_tab", tabName);
+
+    // dashboardに行く前に先読みしておく（体感速度UP）
+    if (tabName === "input" || tabName === "history") {
+      prefetchAllData();
+    }
   }
 
   // ========= POST（Entriesへ追加） =========
   async function postEntry({name, race, bet, pay}) {
-    // Apps Script は doPost(e.parameter...) なので URL-encoded で送るのが確実
     const body = new URLSearchParams({ name, race, bet: String(bet), pay: String(pay) });
 
     const res = await fetch(GAS_BASE, {
@@ -391,55 +434,38 @@
   const fmtJPY = (v) => new Intl.NumberFormat('ja-JP').format(v ?? 0);
   const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
-  // 共通：余白とフォント（スマホで縦軸が欠けないように）
-function getChartLayout() {
-  const mobile = isMobile();
-  return {
-    mobile,
-    // ★元のバランスに戻す（leftを増やしすぎない）
-    gridLeft: mobile ? 56 : 52,
-    gridRight: 18,
+  function getChartLayout() {
+    const mobile = isMobile();
+    return {
+      mobile,
+      gridLeft: 52,      // ★元のバランス重視
+      gridRight: 18,
+      fontAxis: mobile ? 10 : 12,   // ★スマホだけ小さく
+      fontLegend: mobile ? 11 : 12,
+      axisMargin: 8,
+      rotateX: 35
+    };
+  }
 
-    // ★フォントだけ小さく（スマホ中心）
-    fontAxis: mobile ? 10 : 12,
-    fontLegend: mobile ? 11 : 12,
-
-    axisMargin: mobile ? 8 : 8,
-    rotateX: 35
-  };
-}
-
-  // ★棒グラフ：参加者ごとの色を固定
   function makeBar(el, title, participants, values, isPct=false) {
     const chart = echarts.init(document.getElementById(el));
     const L = getChartLayout();
 
     chart.setOption({
       backgroundColor:'transparent',
-      grid:{
-        left: L.gridLeft,
-        right: L.gridRight,
-        top: 20,
-        bottom: 48,
-        containLabel: true // ★これがあるとラベルの欠けに強い
-      },
+      grid:{ left:L.gridLeft, right:L.gridRight, top:20, bottom:48, containLabel:true },
       xAxis:{
         type:'category',
         data:participants,
-        axisLabel:{
-          color:'rgba(233,238,252,.85)',
-          rotate: L.rotateX,
-          fontSize: L.fontAxis,
-          margin: L.axisMargin
-        }
+        axisLabel:{ color:'rgba(233,238,252,.85)', rotate:L.rotateX, fontSize:L.fontAxis, margin:L.axisMargin }
       },
       yAxis:{
         type:'value',
         axisLabel:{
           color:'rgba(233,238,252,.65)',
           formatter:(v)=> isPct?`${v}%`:fmtJPY(v),
-          fontSize: L.fontAxis,
-          margin: L.axisMargin
+          fontSize:L.fontAxis,
+          margin:L.axisMargin
         },
         splitLine:{ lineStyle:{ color:'rgba(255,255,255,.08)' } }
       },
@@ -456,7 +482,7 @@ function getChartLayout() {
         data:values,
         barMaxWidth:42,
         itemStyle:{
-          color: (params) => getColor(params.name),
+          color:(params)=>getColor(params.name),
           borderRadius:[10,10,0,0]
         },
         label:{
@@ -474,17 +500,17 @@ function getChartLayout() {
     return chart;
   }
 
-  // ★折れ線：直線（smooth:false） + 色固定 + ツールチップに「日付 + レース名」
+  // 日付文字列 "9月27日" -> "9月"
+  const toMonth = (s) => {
+    const m = String(s).match(/^(\d+)月/);
+    return m ? `${m[1]}月` : String(s);
+  };
+
   function makeLines(el, block, isPct=false, showZero=false) {
     const chart = echarts.init(document.getElementById(el));
     const L = getChartLayout();
 
     const dates = block?.dates ?? [];
-    const toMonth = (s) => {
-      const m = String(s).match(/^(\d+)月/);
-      return m ? `${m[1]}月` : String(s);
-    };
-
     const legends = block?.series ? Object.keys(block.series) : [];
 
     const series = legends.map(name => ({
@@ -499,43 +525,37 @@ function getChartLayout() {
 
     const opt = {
       backgroundColor:'transparent',
-      legend:{
-        data:legends,
-        top:0,
-        textStyle:{ color:'rgba(233,238,252,.75)', fontSize: L.fontLegend }
-      },
-      grid:{
-        left: L.gridLeft,
-        right: L.gridRight,
-        top: 30,
-        bottom: 44,
-        containLabel: true     // ★ラベル欠け対策
-      },
+      legend:{ data:legends, top:0, textStyle:{ color:'rgba(233,238,252,.75)', fontSize:L.fontLegend } },
+      grid:{ left:L.gridLeft, right:L.gridRight, top:30, bottom:44, containLabel:true },
       xAxis:{
         type:'category',
         data:dates,
+        axisTick:{ alignWithLabel:true },
         axisLabel:{
           color:'rgba(233,238,252,.75)',
-          rotate: L.rotateX,
-          fontSize: L.fontAxis,
-          margin: L.axisMargin,
+          rotate:L.rotateX,
+          fontSize:L.fontAxis,
+          margin:L.axisMargin,
 
-    // ★月だけ表示（同じ月が続くところは空欄にして見やすく）
-    formatter: (value, idx) => {
-      const cur = toMonth(value);
-      const prev = idx > 0 ? toMonth(dates[idx - 1]) : "";
-      return (idx === 0 || cur !== prev) ? cur : "";
-    }
-  }
-},
+          // ★重要：自動間引きを止める（2,3,4,5,6,9,10,11,12月を出したい）
+          interval: 0,
+          hideOverlap: false,
 
+          // ★月だけ表示（同月は1回だけ表示）
+          formatter:(value, idx) => {
+            const cur = toMonth(value);
+            const prev = idx > 0 ? toMonth(dates[idx - 1]) : "";
+            return (idx === 0 || cur !== prev) ? cur : "";
+          }
+        }
+      },
       yAxis:{
         type:'value',
         axisLabel:{
           color:'rgba(233,238,252,.65)',
           formatter:(v)=> isPct?`${v}%`:fmtJPY(v),
-          fontSize: L.fontAxis,
-          margin: L.axisMargin
+          fontSize:L.fontAxis,
+          margin:L.axisMargin
         },
         splitLine:{ lineStyle:{ color:'rgba(255,255,255,.08)' } }
       },
@@ -546,7 +566,7 @@ function getChartLayout() {
           const raceName = getRaceNameByDate(d);
           const head = raceName ? `${d}　${raceName}` : d;
 
-          const lines=params.map(p=>{
+          const lines = params.map(p=>{
             const v=Number(p.value??0);
             return `${p.marker} ${p.seriesName}: <b>${isPct?fmtPct(v):"¥"+fmtJPY(v)}</b>`;
           }).join("<br>");
@@ -580,7 +600,8 @@ function getChartLayout() {
     const updated = document.getElementById("updated");
     updated.textContent = "updated: loading...";
 
-    const data = await loadData();
+    // ★キャッシュ優先で高速取得
+    const data = await getAllDataFast();
 
     const participants = data.summary.map(d => d.participant);
     charts.push(makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false));
@@ -593,17 +614,14 @@ function getChartLayout() {
 
     updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
-  // resizeイベントは多重登録しない（※再描画はしない。サイズ調整だけ）
-  if (!resizeBound) {
-    resizeBound = true;
-
-    window.addEventListener("resize", () => {
-      // グラフのキャンバスサイズだけ調整（見た目が安定する）
-      charts.forEach(c => c?.resize?.());
-    });
+    // resizeイベントは多重登録しない（再描画はしない。サイズ調整だけ）
+    if (!resizeBound) {
+      resizeBound = true;
+      window.addEventListener("resize", () => {
+        charts.forEach(c => c?.resize?.());
+      });
+    }
   }
-}
-
 
   // ========= 初期化 =========
   function fillSelect(id, items) {
@@ -617,24 +635,22 @@ function getChartLayout() {
     });
   }
 
-  // selectを埋める
   fillSelect("name", PARTICIPANTS);
   fillSelect("race", RACES);
 
-  // 入力保持：変更ごとに保存
   ["name","race","bet","pay","keepAmount"].forEach(id => {
     document.getElementById(id).addEventListener("change", saveFormState);
     document.getElementById(id).addEventListener("input", saveFormState);
   });
 
-  // 保存済み復元
   loadFormState();
 
-  // タブ：前回状態復元（input/dashboard/history）
+  // 初回表示後にデータ先読み（体感速度UP）
+  setTimeout(prefetchAllData, 0);
+
   const savedTab = localStorage.getItem("waku_g1_active_tab");
   if (savedTab === "dashboard" || savedTab === "history") setTab(savedTab);
 
-  // タブボタン
   document.querySelectorAll(".tabbtn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const t = btn.dataset.tab;
@@ -646,23 +662,24 @@ function getChartLayout() {
     });
   });
 
-  // 入力→ダッシュボード
   document.getElementById("toDash").addEventListener("click", async () => {
     setTab("dashboard");
     try { await renderDashboard(); }
     catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
   });
 
-  // ダッシュボード→入力
   document.getElementById("toInput").addEventListener("click", () => setTab("input"));
 
-  // 再読み込み
   document.getElementById("reloadBtn").addEventListener("click", async () => {
-    try { await renderDashboard(); }
-    catch (e) { alert("再読み込みエラー: " + e.message); }
+    try {
+      // 強制更新：キャッシュ無効化
+      cachedAllDataAt = 0;
+      await renderDashboard();
+    } catch (e) {
+      alert("再読み込みエラー: " + e.message);
+    }
   });
 
-  // 送信
   document.getElementById("entryForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
 
@@ -674,16 +691,16 @@ function getChartLayout() {
     try {
       await postEntry({ name, race, bet, pay });
 
-      // 送信後も参加者/レースは保持
-      // 「金額も保持」OFFなら bet/pay だけクリア
       const keepAmount = document.getElementById("keepAmount").checked;
       if (!keepAmount) {
         document.getElementById("bet").value = "";
         document.getElementById("pay").value = "";
       }
 
-      // 状態保存（次回も保持）
       saveFormState();
+
+      // 入力後も次の表示が速いように先読み
+      prefetchAllData();
 
     } catch (e) {
       alert(e.message);
