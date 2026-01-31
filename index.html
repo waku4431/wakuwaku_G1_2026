@@ -275,6 +275,8 @@
 
   // ========= マスタ =========
   const PARTICIPANTS = ["わくだ","きよもと","せきざわ","たきざわ","粗品"];
+
+  // ★あなたが指定した表記に統一（これが「正」）
   const RACES = [
     "フェブラリーステークス（2月22日）",
     "高松宮記念（3月29日）",
@@ -608,51 +610,85 @@
   }
 
   // ========= 収支表（ヒートマップ） =========
-  // RACESマスタ順で並べるための正規化
-  const normalizeRace = (s) => {
+
+  // ★表記ゆれ吸収キー（GASのレース名が日付あり/なし等でも同一視）
+  function normalizeRaceKey(s) {
     if (!s) return "";
     let t = String(s).trim();
-    t = t.replace(/^[【\[]/, "").replace(/[】\]]$/, "");  // 先頭末尾の括弧っぽいの
-    t = t.replace(/【/g, "").replace(/】/g, "");         // 中の【】も除去
-    t = t.replace(/（.*?）/g, "");                       // かっこ日付を除去
+
+    // 例: "フェブラリーS" "フェブラリーステークス（2月22日）" "【有馬記念】" などを統一したい
+    // 1) 日付括弧を削除
+    t = t.replace(/（\d+月\d+日）/g, "");
+    // 2) 角括弧/全括弧などを削除
+    t = t.replace(/[【】\[\]\(\)（）]/g, "");
+    // 3) 全角英数→半角
+    t = t.replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+    // 4) 空白削除
     t = t.replace(/\s+/g, "");
+
+    // 5) よくある表記ゆれ
+    // "ステークス" -> "S"
+    t = t.replace(/ステークス/g, "S").replace(/Ｓ/g, "S");
+    // "フェブラリーS" と "フェブラリーステークス" を揃える（上でステークス→S済みなので最終的に同じになる）
+    // 例: "フェブラリーステークス" -> "フェブラリーS" みたいな揺れも、ここでは「意味が同じなら同じキー」になればOK
+
     return t;
-  };
+  }
 
-  const RACE_ORDER = (() => {
-    const m = new Map();
-    RACES.forEach((s, i) => {
-      const base = normalizeRace(s);
-      if (base) m.set(base, i);
+  function isTotalLabel(label) {
+    const k = normalizeRaceKey(label).toUpperCase();
+    // "合計", "総計", "TOTAL" などを合計行として検出
+    return k === "合計" || k === "総計" || k === "TOTAL" || k === "GRANDTOTAL";
+  }
+
+  // ★収支表は「RACESマスタ順」で必ず再構築し、表示ラベルもマスタに統一
+  function rebuildProfitRowsByMaster(profitTableRaw) {
+    const headers = profitTableRaw?.headers ?? [];
+    const rowsRaw = (profitTableRaw?.rows ?? []).slice();
+    if (headers.length < 2) return { headers, rows: [] };
+
+    const rowMap = new Map(); // key: normalizeRaceKey(rowLabel) => row
+    let totalRow = null;
+
+    for (const r of rowsRaw) {
+      const label = String(r?.[0] ?? "");
+      if (isTotalLabel(label)) {
+        totalRow = r;
+        continue;
+      }
+      rowMap.set(normalizeRaceKey(label), r);
+    }
+
+    // マスタ順で行を作る（見つかったら値を採用、見つからないなら0行）
+    const rows = RACES.map(masterLabel => {
+      const key = normalizeRaceKey(masterLabel);
+      const found = rowMap.get(key);
+
+      if (found) {
+        // ★表示ラベルは必ず masterLabel に統一
+        const copied = found.slice();
+        copied[0] = masterLabel;
+        return copied;
+      }
+
+      // 未開催など → 0行
+      return [masterLabel, ...headers.slice(1).map(() => 0)];
     });
-    return m;
-  })();
 
-  function sortProfitRowsByMaster(profitTable) {
-    const headers = profitTable?.headers ?? [];
-    const rows = (profitTable?.rows ?? []).slice();
-    if (rows.length <= 1) return profitTable;
+    // 合計行が来た場合は最後に
+    if (totalRow) {
+      const copied = totalRow.slice();
+      copied[0] = "合計";
+      rows.push(copied);
+    }
 
-    // 合計行は「最後の行」として扱う（強調したい前提）
-    const totalRow = rows.pop();
-
-    const sorted = rows.sort((a, b) => {
-      const an = normalizeRace(a?.[0]);
-      const bn = normalizeRace(b?.[0]);
-      const ai = RACE_ORDER.has(an) ? RACE_ORDER.get(an) : 9999;
-      const bi = RACE_ORDER.has(bn) ? RACE_ORDER.get(bn) : 9999;
-      if (ai !== bi) return ai - bi;
-      return an.localeCompare(bn, "ja");
-    });
-
-    sorted.push(totalRow);
-    return { headers, rows: sorted };
+    return { headers, rows };
   }
 
   function buildProfitTableOption(profitTableRaw) {
-    const profitTable = sortProfitRowsByMaster(profitTableRaw);
-    const headers = profitTable?.headers ?? [];
-    const rows = profitTable?.rows ?? [];
+    const rebuilt = rebuildProfitRowsByMaster(profitTableRaw);
+    const headers = rebuilt.headers;
+    const rows = rebuilt.rows;
 
     if (headers.length < 2 || rows.length === 0) {
       return { option: null, chartWidth: 600 };
@@ -660,7 +696,10 @@
 
     const people = headers.slice(1);
     const races = rows.map(r => String(r[0] ?? ""));
-    const totalRowIndex = rows.length - 1;
+
+    // 合計行があるなら index を探す（無ければ -1）
+    const totalRowIndex = rows.findIndex(r => isTotalLabel(r?.[0]));
+    // rebuild時にラベルを "合計" にしてるので、見つかるのが普通
 
     let min = Infinity, max = -Infinity;
     const data = []; // [x, y, v]
@@ -680,6 +719,7 @@
     const absMax = Math.max(Math.abs(min), Math.abs(max)) || 1;
 
     const colW = isMobile() ? 96 : 112;
+    // 左のレース名欄（ちょいコンパクト）
     const leftW = isMobile() ? 120 : 160;
     const chartWidth = leftW + people.length * colW + 30;
 
@@ -700,6 +740,7 @@
       xAxis: {
         type: 'category',
         data: people,
+        position: 'top',              // ★これ追加：名前を上に
         axisLabel: {
           color:'rgba(233,238,252,.85)',
           fontSize: isMobile() ? 10 : 11,
@@ -709,13 +750,18 @@
         axisTick: { alignWithLabel: true }
       },
 
+
       yAxis: {
         type: 'category',
         data: races,
+        inverse: true, // ★ここが「逆」解消の決定打（先頭＝上）
         axisLabel: {
           color:'rgba(233,238,252,.78)',
           fontSize: isMobile() ? 10 : 11,
-          formatter: (v, idx) => idx === totalRowIndex ? `【${v}】` : v
+          formatter: (v, idx) => {
+            if (totalRowIndex >= 0 && idx === totalRowIndex) return `【${v}】`;
+            return v;
+          }
         },
         axisLine: { lineStyle: { color:'rgba(255,255,255,.14)' } },
         axisTick: { show: false }
@@ -754,7 +800,7 @@
           const y = api.value(1);
           const val = api.value(2);
 
-          const isTotal = (y === totalRowIndex);
+          const isTotal = (totalRowIndex >= 0 && y === totalRowIndex);
 
           const point = api.coord([x, y]);
           const size = api.size([1, 1]);
@@ -908,24 +954,45 @@
   });
 
   loadFormState();
-  setTimeout(prefetchAllData, 0);
+  prefetchAllData(); // setTimeout じゃなく即
+
 
   const savedTab = localStorage.getItem("waku_g1_active_tab");
-  if (savedTab === "dashboard" || savedTab === "table" || savedTab === "history") setTab(savedTab);
+
+  // まずタブだけ切り替える
+  if (savedTab === "dashboard" || savedTab === "table" || savedTab === "history") {
+    setTab(savedTab);
+  }
+
+  // ★表示が確定してから最速で描画（display:none問題を回避）
+  requestAnimationFrame(async () => {
+    try {
+      if (savedTab === "dashboard") await renderDashboard();
+      if (savedTab === "table") await renderTable();
+    } catch (e) {
+      alert("初期描画エラー: " + e.message);
+    }
+  });
+
+
 
   document.querySelectorAll(".tabbtn").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const t = btn.dataset.tab;
       setTab(t);
 
-      try {
-        if (t === "dashboard") await renderDashboard();
-        if (t === "table") await renderTable();
-      } catch (e) {
-        alert("取得エラー: " + e.message);
+    // ★表示が確定してから描画（最速＆安定）
+      requestAnimationFrame(async () => {
+        try {
+          if (t === "dashboard") await renderDashboard();
+          if (t === "table") await renderTable();
+        } catch (e) {
+          alert("取得エラー: " + e.message);
       }
     });
   });
+});
+
 
   document.getElementById("toDash").addEventListener("click", async () => {
     setTab("dashboard");
