@@ -51,11 +51,11 @@
 
         <div class="row">
           <label>掛け金（円）
-            <input id="bet" type="number" inputmode="numeric" min="0" step="100" placeholder="例：1000" required />
+            <input id="bet" type="number" inputmode="numeric" min="0" step="100" placeholder="半角数字のみ" required />
           </label>
 
           <label>回収額（円）
-            <input id="pay" type="number" inputmode="numeric" min="0" step="100" placeholder="例：0" required />
+            <input id="pay" type="number" inputmode="numeric" min="0" step="100" placeholder="半角数字のみ" required />
           </label>
         </div>
 
@@ -167,7 +167,8 @@
         form.reset();
 
         // reset すると select が先頭（プレースホルダ）に戻るので、残したければここを変える
-        // nameEl.value = name; // ← 参加者を保持したいならコメント外す
+        nameEl.value = name; // ← 参加者を保持したいならコメント外す
+        raceEl.value = race;
 
       } catch (e) {
         statusEl.textContent = "送信に失敗しました。ネットワークやURLを確認してください。";
