@@ -844,206 +844,202 @@
   }
 
   function makeProfitTable() {
-    const dom = document.getElementById("profitTable");
-    const chart = echarts.init(dom);
+  const dom = document.getElementById("profitTable");
+  const chart = echarts.init(dom);
 
-    return {
-      chart,
-      set: (profitTable) => {
-        const { option, designWidth } = buildProfitTableOption(profitTable);
+  return {
+    chart,
+    set: (profitTable) => {
+      const { option, designWidth } = buildProfitTableOption(profitTable);
 
-        // ★iPhoneは必要なら縮小して横スクロールを極小化
-        applyMobileScaleForTable(designWidth);
+      // ★iPhoneは必要なら縮小して横スクロールを極小化 + 中央寄せ
+      applyMobileScaleForTable(designWidth);
 
-        if (!option) {
-          chart.clear();
-          chart.setOption({
-            title: { text: '収支データがありません', left: 'center', top: 'middle',
-              textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
-          }, true);
-          requestAnimationFrame(() => chart.resize());
-          return;
-        }
-
-        chart.setOption(option, true);
-
-        // ★表示直後にresize（iPhoneでのズレ対策）
+      if (!option) {
+        chart.clear();
+        chart.setOption({
+          title: { text: '収支データがありません', left: 'center', top: 'middle',
+            textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
+        }, true);
         requestAnimationFrame(() => chart.resize());
+        return;
       }
-    };
-  }
 
-  // ========= 描画制御 =========
-  let dashCharts = [];
-  let tableChartWrap = null;
-  let resizeBound = false;
+      chart.setOption(option, true);
 
-  async function renderDashboard() {
-    dashCharts.forEach(c => safeDispose(c));
-    dashCharts = [];
-
-    const updated = document.getElementById("updatedDash");
-    updated.textContent = "updated: loading...";
-
-    const data = await getAllDataFast();
-    const participants = data.summary.map(d => d.participant);
-
-    dashCharts.push(makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false));
-    dashCharts.push(makeBar("barProfit", "収支", participants, data.summary.map(d=>Number(d.profit_total??0)), false));
-    dashCharts.push(makeBar("barRoi", "回収率", participants, data.summary.map(d=>Number(d.roi??0)), true));
-
-    dashCharts.push(makeLines("lineCumBet", data.cumBet, false, false));
-    dashCharts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
-    dashCharts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
-
-    updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
-
-    if (!resizeBound) bindResize();
-  }
-
-  async function renderTable() {
-    const updated = document.getElementById("updatedTable");
-    updated.textContent = "updated: loading...";
-
-    const data = await getAllDataFast();
-
-    if (!tableChartWrap) {
-      tableChartWrap = makeProfitTable();
+      // ★表示直後にresize（iPhoneでのズレ対策）
+      requestAnimationFrame(() => chart.resize());
     }
-    tableChartWrap.set(data.profitTable);
+  };
+}
 
-    updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
+// ========= 描画制御 =========
+let dashCharts = [];
+let tableChartWrap = null;
+let resizeBound = false;
 
-    if (!resizeBound) bindResize();
+async function renderDashboard() {
+  dashCharts.forEach(c => safeDispose(c));
+  dashCharts = [];
+
+  const updated = document.getElementById("updatedDash");
+  updated.textContent = "updated: loading...";
+
+  const data = await getAllDataFast();
+  const participants = data.summary.map(d => d.participant);
+
+  dashCharts.push(makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false));
+  dashCharts.push(makeBar("barProfit", "収支", participants, data.summary.map(d=>Number(d.profit_total??0)), false));
+  dashCharts.push(makeBar("barRoi", "回収率", participants, data.summary.map(d=>Number(d.roi??0)), true));
+
+  dashCharts.push(makeLines("lineCumBet", data.cumBet, false, false));
+  dashCharts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
+  dashCharts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
+
+  updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
+
+  if (!resizeBound) bindResize();
+}
+
+async function renderTable() {
+  const updated = document.getElementById("updatedTable");
+  updated.textContent = "updated: loading...";
+
+  const data = await getAllDataFast();
+
+  if (!tableChartWrap) {
+    tableChartWrap = makeProfitTable();
   }
+  tableChartWrap.set(data.profitTable);
 
-  function bindResize() {
-    resizeBound = true;
-    window.addEventListener("resize", () => {
-      dashCharts.forEach(c => c?.resize?.());
+  updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
-      // ★iPhoneの回転・幅変化でscale再計算
-      if (tableChartWrap?.chart) {
-        try {
-          const opt = tableChartWrap.chart.getOption();
-          // 再描画トリガだけ入れる（setOptionし直しは不要）
-          requestAnimationFrame(() => tableChartWrap.chart.resize());
-        } catch {}
-      }
-    });
-  }
+  if (!resizeBound) bindResize();
+}
 
-  // ========= セレクト =========
-  function fillSelect(id, items) {
-    const sel = document.getElementById(id);
-    sel.innerHTML = "";
-    items.forEach(v => {
-      const opt = document.createElement("option");
-      opt.value = v;
-      opt.textContent = v;
-      sel.appendChild(opt);
-    });
-  }
+function bindResize() {
+  resizeBound = true;
+  window.addEventListener("resize", () => {
+    dashCharts.forEach(c => c?.resize?.());
 
-  fillSelect("name", PARTICIPANTS);
-  fillSelect("race", RACES);
-
-  ["name","race","bet","pay","keepAmount"].forEach(id => {
-    document.getElementById(id).addEventListener("change", saveFormState);
-    document.getElementById(id).addEventListener("input", saveFormState);
-  });
-
-  loadFormState();
-
-  // ★起動直後に先読み（体感を速く）
-  prefetchAllData();
-
-  // ====== 初期タブ復元（保存タブがdashboard/tableでも自動描画） ======
-  const savedTab = localStorage.getItem("waku_g1_active_tab");
-  if (knowTab(savedTab)) {
-    setTab(savedTab);
-  }
-
-  // ★表示確定後に描画（display:none問題回避）
-  requestAnimationFrame(async () => {
-    try {
-      if (savedTab === "dashboard") await renderDashboard();
-      if (savedTab === "table") await renderTable();
-    } catch (e) {
-      alert("初期描画エラー: " + e.message);
-    }
-  });
-
-  // ====== タブクリック（表示確定後に描画） ======
-  document.querySelectorAll(".tabbtn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const t = btn.dataset.tab;
-      setTab(t);
-
-      requestAnimationFrame(async () => {
-        try {
-          if (t === "dashboard") await renderDashboard();
-          if (t === "table") await renderTable();
-        } catch (e) {
-          alert("取得エラー: " + e.message);
-        }
+    // ★iPhoneの回転・幅変化でscale再計算が必要なので、
+    // tableは「最新データ再取得」じゃなく「今のoptionで再resize」する
+    if (tableChartWrap?.chart) {
+      requestAnimationFrame(() => {
+        try { tableChartWrap.chart.resize(); } catch {}
       });
-    });
+    }
   });
+}
 
-  document.getElementById("toDash").addEventListener("click", () => {
-    setTab("dashboard");
+// ========= セレクト =========
+function fillSelect(id, items) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = "";
+  items.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    sel.appendChild(opt);
+  });
+}
+
+fillSelect("name", PARTICIPANTS);
+fillSelect("race", RACES);
+
+["name","race","bet","pay","keepAmount"].forEach(id => {
+  document.getElementById(id).addEventListener("change", saveFormState);
+  document.getElementById(id).addEventListener("input", saveFormState);
+});
+
+loadFormState();
+
+// ★起動直後に先読み（体感を速く）
+prefetchAllData();
+
+// ====== 初期タブ復元（保存タブがdashboard/tableでも自動描画） ======
+const savedTab = localStorage.getItem("waku_g1_active_tab");
+if (knowTab(savedTab)) {
+  setTab(savedTab);
+}
+
+// ★表示確定後に描画（display:none問題回避）
+requestAnimationFrame(async () => {
+  try {
+    if (savedTab === "dashboard") await renderDashboard();
+    if (savedTab === "table") await renderTable();
+  } catch (e) {
+    alert("初期描画エラー: " + e.message);
+  }
+});
+
+// ====== タブクリック（表示確定後に描画） ======
+document.querySelectorAll(".tabbtn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const t = btn.dataset.tab;
+    setTab(t);
+
     requestAnimationFrame(async () => {
-      try { await renderDashboard(); }
-      catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
+      try {
+        if (t === "dashboard") await renderDashboard();
+        if (t === "table") await renderTable();
+      } catch (e) {
+        alert("取得エラー: " + e.message);
+      }
     });
   });
+});
 
-  document.getElementById("toInputFromDash").addEventListener("click", () => setTab("input"));
-  document.getElementById("toInputFromTable").addEventListener("click", () => setTab("input"));
-
-  document.getElementById("reloadDashBtn").addEventListener("click", async () => {
-    try {
-      cachedAllDataAt = 0;
-      await renderDashboard();
-    } catch (e) {
-      alert("再読み込みエラー: " + e.message);
-    }
+document.getElementById("toDash").addEventListener("click", () => {
+  setTab("dashboard");
+  requestAnimationFrame(async () => {
+    try { await renderDashboard(); }
+    catch (e) { alert("ダッシュボード取得エラー: " + e.message); }
   });
+});
 
-  document.getElementById("reloadTableBtn").addEventListener("click", async () => {
-    try {
-      cachedAllDataAt = 0;
-      await renderTable();
-    } catch (e) {
-      alert("再読み込みエラー: " + e.message);
+document.getElementById("toInputFromDash").addEventListener("click", () => setTab("input"));
+document.getElementById("toInputFromTable").addEventListener("click", () => setTab("input"));
+
+document.getElementById("reloadDashBtn").addEventListener("click", async () => {
+  try {
+    cachedAllDataAt = 0;
+    await renderDashboard();
+  } catch (e) {
+    alert("再読み込みエラー: " + e.message);
+  }
+});
+
+document.getElementById("reloadTableBtn").addEventListener("click", async () => {
+  try {
+    cachedAllDataAt = 0;
+    await renderTable();
+  } catch (e) {
+    alert("再読み込みエラー: " + e.message);
+  }
+});
+
+document.getElementById("entryForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+
+  const name = document.getElementById("name").value;
+  const race = document.getElementById("race").value;
+  const bet  = Number(document.getElementById("bet").value || 0);
+  const pay  = Number(document.getElementById("pay").value || 0);
+
+  try {
+    await postEntry({ name, race, bet, pay });
+
+    const keepAmount = document.getElementById("keepAmount").checked;
+    if (!keepAmount) {
+      document.getElementById("bet").value = "";
+      document.getElementById("pay").value = "";
     }
-  });
 
-  document.getElementById("entryForm").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
+    saveFormState();
+    prefetchAllData();
 
-    const name = document.getElementById("name").value;
-    const race = document.getElementById("race").value;
-    const bet  = Number(document.getElementById("bet").value || 0);
-    const pay  = Number(document.getElementById("pay").value || 0);
-
-    try {
-      await postEntry({ name, race, bet, pay });
-
-      const keepAmount = document.getElementById("keepAmount").checked;
-      if (!keepAmount) {
-        document.getElementById("bet").value = "";
-        document.getElementById("pay").value = "";
-      }
-
-      saveFormState();
-      prefetchAllData();
-
-    } catch (e) {
-      alert(e.message);
-    }
-  });
-</script>
-</body>
-</html>
+  } catch (e) {
+    alert(e.message);
+  }
+});
