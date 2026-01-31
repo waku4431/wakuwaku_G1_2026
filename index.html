@@ -48,12 +48,11 @@
 
     .wrap{max-width:1200px; margin:0 auto; padding:10px 12px 26px;}
 
-    /* ★カード内余白をさらに詰めてグラフ領域を増やす */
     .card{
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
       border:1px solid var(--border);
       border-radius:16px;
-      padding:8px;            /* 10 -> 8 */
+      padding:8px;
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
       overflow:hidden;
     }
@@ -112,15 +111,23 @@
     .c5{grid-column: span 4;}
     .c6{grid-column: span 4;}
 
-    /* ★グラフの高さを微調整（スマホで“デカすぎず小さすぎず”） */
     .chart{width:100%; height:320px;}
     .chartTall{width:100%; height:360px;}
+
+    /* ★収支表（ECharts表） */
+    .tableWrap{
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      border-radius:12px;
+    }
+    .chartTable{height:560px;} /* 行数多めなので少し高く */
 
     @media (max-width: 900px){
       .form{grid-template-columns: 1fr;}
       .c1,.c2,.c3,.c4,.c5,.c6{grid-column: span 12;}
       .chart{height:295px;}
       .chartTall{height:335px;}
+      .chartTable{height:520px;}
     }
 
     a.linkcard{
@@ -218,6 +225,17 @@
       <div class="card c4"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
       <div class="card c5"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積収支 [円] <span class="hint">0ライン</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
       <div class="card c6"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
+
+      <!-- ★追加：収支表（ECharts 表） -->
+      <div class="card" style="grid-column: span 12;">
+        <div class="row" style="justify-content:space-between; margin:0 0 6px;">
+          <h2 style="margin:0; color:var(--muted); font-size:13px;">収支表（ヒートマップ）</h2>
+          <span class="hint">横スクロールOK / 最終行は合計として強調</span>
+        </div>
+        <div id="profitTableWrap" class="tableWrap">
+          <div id="profitTable" class="chartTable"></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -401,23 +419,27 @@
     return text;
   }
 
-  // ========= ECharts =========
+  // ========= ECharts共通 =========
   const fmtJPY = (v) => new Intl.NumberFormat('ja-JP').format(v ?? 0);
   const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
-  // ★余白最適化（左と下をさらに詰める）
+  function safeDispose(chart) {
+    try { chart?.dispose?.(); } catch {}
+  }
+
+  // ★余白最適化
   function getChartLayout() {
     const mobile = isMobile();
     return {
       mobile,
 
-      gridLeft:  mobile ? 5 : 46,  // 左を詰める
+      gridLeft:  mobile ? 5 : 46,
       gridRight: mobile ? 10 : 14,
       gridTopBar: 18,
       gridTopLine: 30,
 
       gridBottomBar:  mobile ? 32 : 40,
-      gridBottomLine: mobile ? 15 : 34, // 下を詰める
+      gridBottomLine: mobile ? 15 : 34,
 
       fontAxis: mobile ? 9 : 11,
       fontLegend: mobile ? 10 : 12,
@@ -480,13 +502,12 @@
     return chart;
   }
 
-  // ★折れ線：横軸は「レース回数」、表示は偶数だけ、ただしラベル自体は表示する
   function makeLines(el, block, isPct=false, showZero=false) {
     const chart = echarts.init(document.getElementById(el));
     const L = getChartLayout();
 
     const dates = block?.dates ?? [];
-    const xLabels = dates.map((_, i) => String(i + 1)); // 1..N
+    const xLabels = dates.map((_, i) => String(i + 1));
 
     const legends = block?.series ? Object.keys(block.series) : [];
     const series = legends.map(name => ({
@@ -515,14 +536,10 @@
         data:xLabels,
         boundaryGap:false,
         axisTick:{ alignWithLabel:true },
-
         axisLabel:{
           color:'rgba(233,238,252,.75)',
           fontSize:L.fontAxis,
           margin:6,
-
-          // ★偶数だけ表示（2,4,6...）
-          // ただし 1 と 最後 は出す（端が分からなくなるの防止）
           interval: 0,
           formatter: (val, idx) => {
             const n = Number(val);
@@ -531,8 +548,6 @@
             return (n % 2 === 0) ? String(n) : "";
           }
         },
-
-        // ★横軸タイトル（ラベル）を表示
         name: "レース回数",
         nameLocation: "middle",
         nameGap: L.mobile ? 20 : 24,
@@ -582,11 +597,204 @@
     return chart;
   }
 
+  // ========= ★追加：profitTable（ECharts表） =========
+  function buildProfitTableOption(profitTable) {
+    const headers = profitTable?.headers ?? [];
+    const rows = profitTable?.rows ?? [];
+    if (headers.length < 2 || rows.length === 0) {
+      return { option: null, chartWidth: 600 };
+    }
+
+    const people = headers.slice(1);
+    const races = rows.map(r => String(r[0] ?? ""));
+    const totalRowIndex = rows.length - 1;
+
+    let min = Infinity, max = -Infinity;
+    const data = []; // [x, y, v]
+
+    for (let y = 0; y < rows.length; y++) {
+      const r = rows[y];
+      for (let x = 0; x < people.length; x++) {
+        const v = Number(r[x + 1] ?? 0);
+        if (!Number.isNaN(v)) {
+          min = Math.min(min, v);
+          max = Math.max(max, v);
+        }
+        data.push([x, y, v]);
+      }
+    }
+
+    const absMax = Math.max(Math.abs(min), Math.abs(max)) || 1;
+
+    // 列数に応じて横幅を伸ばす（横スクロール前提）
+    const colW = isMobile() ? 96 : 112;
+    const leftW = isMobile() ? 120 : 160;
+    const chartWidth = leftW + people.length * colW + 30;
+
+    // 行高（多すぎると読めないので少し厚め）
+    const cellH = isMobile() ? 24 : 26;
+
+    const option = {
+      animation: false,
+      backgroundColor: 'transparent',
+
+      grid: {
+        top: 34,
+        left: leftW,
+        right: 16,
+        bottom: 12,
+        containLabel: false
+      },
+
+      xAxis: {
+        type: 'category',
+        data: people,
+        axisLabel: {
+          color:'rgba(233,238,252,.85)',
+          fontSize: isMobile() ? 10 : 11,
+          interval: 0
+        },
+        axisLine: { lineStyle: { color:'rgba(255,255,255,.14)' } },
+        axisTick: { alignWithLabel: true }
+      },
+
+      yAxis: {
+        type: 'category',
+        data: races,
+        axisLabel: {
+          color:'rgba(233,238,252,.78)',
+          fontSize: isMobile() ? 10 : 11,
+          formatter: (v, idx) => idx === totalRowIndex ? `【${v}】` : v
+        },
+        axisLine: { lineStyle: { color:'rgba(255,255,255,.14)' } },
+        axisTick: { show: false }
+      },
+
+      // 0中心の赤↔白↔青
+      visualMap: {
+        type: 'continuous',
+        min: -absMax,
+        max: absMax,
+        show: false,       // 表の俯瞰優先（必要ならtrueに）
+        calculable: false,
+        inRange: {
+          color: ['#ff6b6b', '#141a2a', '#7aa2ff'] // 赤→暗め→青
+        }
+      },
+
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(10,14,26,.95)',
+        borderColor: 'rgba(255,255,255,.18)',
+        textStyle: { color:'#e9eefc' },
+        formatter: (p) => {
+          const x = p.data[0], y = p.data[1], v = p.data[2];
+          const name = people[x];
+          const race = races[y];
+          const sign = v > 0 ? '+' : '';
+          return `${race}<br>${name}: <b>${sign}${fmtJPY(v)}円</b>`;
+        }
+      },
+
+      series: [{
+        type: 'custom',
+        data,
+
+        renderItem: (params, api) => {
+          const x = api.value(0);
+          const y = api.value(1);
+          const val = api.value(2);
+
+          const isTotal = (y === totalRowIndex);
+
+          // セル中心座標とサイズ
+          const point = api.coord([x, y]);
+          const size = api.size([1, 1]);
+
+          // 行高を固定寄りに（見やすさ優先）
+          const w = size[0];
+          const h = Math.max(cellH, size[1]);
+
+          const rect = {
+            x: point[0] - w/2,
+            y: point[1] - h/2,
+            width: w,
+            height: h
+          };
+
+          const sign = val > 0 ? '+' : '';
+          const text = `${sign}${fmtJPY(val)}`;
+
+          // 合計行：枠太く + 文字太く
+          const stroke = isTotal ? 'rgba(233,238,252,.75)' : 'rgba(255,255,255,.10)';
+          const lw = isTotal ? 2 : 1;
+
+          // 文字色：背景が濃いとき白寄りに（簡易）
+          const txt = Math.abs(val) > absMax * 0.55 ? 'rgba(255,255,255,.92)' : 'rgba(233,238,252,.88)';
+
+          return {
+            type: 'group',
+            children: [
+              {
+                type: 'rect',
+                shape: rect,
+                style: {
+                  fill: api.visual('color'),
+                  stroke,
+                  lineWidth: lw
+                }
+              },
+              {
+                type: 'text',
+                style: {
+                  x: rect.x + rect.width/2,
+                  y: rect.y + rect.height/2,
+                  text,
+                  fill: txt,
+                  fontSize: isMobile() ? 10 : 11,
+                  fontWeight: isTotal ? 800 : 500,
+                  align: 'center',
+                  verticalAlign: 'middle'
+                }
+              }
+            ]
+          };
+        }
+      }]
+    };
+
+    return { option, chartWidth };
+  }
+
+  function makeProfitTable(el, wrapEl, profitTable) {
+    const dom = document.getElementById(el);
+    const wrap = document.getElementById(wrapEl);
+
+    const chart = echarts.init(dom);
+    const { option, chartWidth } = buildProfitTableOption(profitTable);
+
+    // 横幅を伸ばして横スクロール
+    dom.style.width = `${chartWidth}px`;
+    chart.resize();
+
+    if (!option) {
+      chart.clear();
+      chart.setOption({
+        title: { text: '収支データがありません', left: 'center', top: 'middle', textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
+      });
+      return chart;
+    }
+
+    chart.setOption(option);
+    return chart;
+  }
+
+  // ========= 描画制御 =========
   let charts = [];
   let resizeBound = false;
 
   async function renderDashboard() {
-    charts.forEach(c => c?.dispose?.());
+    charts.forEach(c => safeDispose(c));
     charts = [];
 
     const updated = document.getElementById("updated");
@@ -603,6 +811,11 @@
     charts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
     charts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
 
+    // ★追加：収支表
+    if (data.profitTable) {
+      charts.push(makeProfitTable("profitTable", "profitTableWrap", data.profitTable));
+    }
+
     updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
 
     if (!resizeBound) {
@@ -611,6 +824,7 @@
     }
   }
 
+  // ========= セレクト =========
   function fillSelect(id, items) {
     const sel = document.getElementById(id);
     sel.innerHTML = "";
