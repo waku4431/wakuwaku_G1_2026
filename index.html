@@ -2,191 +2,312 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>わくわくG1サイト 2026</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>wakuwaku G1 2026 - Dashboard</title>
+
+  <!-- ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
   <style>
-    /* iPhone Safariのはみ出し対策 */
-    * { box-sizing: border-box; }
-
-    input, select, button {
-    width: 100%;
-    max-width: 100%;
+    :root{
+      --bg:#0b1020;
+      --card:#111a33;
+      --text:#e9eefc;
+      --muted:#9fb0dd;
+      --border:rgba(255,255,255,.08);
+      --danger:#ff6b6b;
     }
-
-label { min-width: 0; } /* grid内でのはみ出し防止 */
-
-    
-    :root { --bg:#f6f7fb; --card:#fff; --text:#111; --muted:#666; --border:#ddd; }
-    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
-    .container { max-width: 720px; margin: 0 auto; padding: 16px; }
-    h1 { font-size: 22px; margin: 8px 0 14px; }
-    .card { background:var(--card); border-radius: 14px; padding: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
-    .form { display:grid; gap: 12px; }
-    label { display:grid; gap: 6px; font-size: 14px; }
-    input, select {
-      padding: 12px 12px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      font-size: 16px;
-      background:#fff;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      background: radial-gradient(1200px 600px at 50% -100px, #1b2a5a 0%, var(--bg) 55%, #070a14 100%);
+      color:var(--text);
     }
-    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
-    button {
-      padding: 12px 14px;
-      border: 0;
-      border-radius: 12px;
-      font-size: 16px;
-      cursor: pointer;
+    header{
+      padding:18px 16px 10px;
+      max-width:1200px; margin:0 auto;
+      display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
     }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    .status { margin: 6px 0 0; font-size: 13px; color: var(--muted); min-height: 1.2em; }
-    .hint { font-size: 12px; color: var(--muted); margin: 0; }
+    h1{margin:0; font-size:22px; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:12px; margin-top:6px}
+    .wrap{max-width:1200px; margin:0 auto; padding:12px 12px 28px;}
+    .grid{
+      display:grid; gap:12px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      overflow:hidden;
+    }
+    .card h2{
+      margin:0 0 8px 0;
+      font-size:13px;
+      font-weight:700;
+      color:var(--muted);
+      letter-spacing:.3px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .chart{width:100%; height:280px;}
+    .chartTall{width:100%; height:320px;}
+    .c1{grid-column: span 4;}
+    .c2{grid-column: span 4;}
+    .c3{grid-column: span 4;}
+    .c4{grid-column: span 4;}
+    .c5{grid-column: span 4;}
+    .c6{grid-column: span 4;}
+
+    @media (max-width: 900px){
+      header{flex-direction:column; align-items:flex-start;}
+      .c1,.c2,.c3,.c4,.c5,.c6{grid-column: span 12;}
+      .chart{height:260px;}
+      .chartTall{height:300px;}
+    }
+    .toolbar{
+      display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+      color:var(--muted); font-size:12px;
+    }
+    .badge{
+      border:1px solid var(--border);
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.03);
+    }
+    .badge.danger{
+      border-color: rgba(255,107,107,.5);
+      color: var(--danger);
+    }
+    .hint{
+      font-size:11px;
+      color:rgba(233,238,252,.65);
+      margin-top:6px;
+    }
+    .btn{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      padding:6px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:12px;
+    }
+    .btn:hover{background: rgba(255,255,255,.06);}
   </style>
 </head>
-
 <body>
-  <main class="container">
-    <h1>wakuwaku G1 2026</h1>
+<header>
+  <div>
+    <h1>wakuwaku G1 2026 - Dashboard</h1>
+    <div class="sub">Sheets(WebData) → GAS(JSON) → ECharts（自動更新）</div>
+  </div>
+  <div class="toolbar">
+    <span class="badge" id="updated">updated: -</span>
+    <button class="btn" id="reloadBtn" type="button">再読み込み</button>
+  </div>
+</header>
 
-    <section class="card">
-      <form id="entryForm" class="form">
-        <label>参加者
-          <select id="name" required></select>
-        </label>
+<div class="wrap">
+  <div class="grid">
+    <div class="card c1"><h2>掛け金合計 [円]</h2><div id="barBet" class="chart"></div></div>
+    <div class="card c2"><h2>収支 [円]</h2><div id="barProfit" class="chart"></div></div>
+    <div class="card c3"><h2>回収率 [%]</h2><div id="barRoi" class="chart"></div></div>
 
-        <label>G1レース名
-          <select id="race" required></select>
-        </label>
+    <div class="card c4"><h2>累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
+    <div class="card c5"><h2>累積収支 [円] <span class="hint">0ライン表示</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
+    <div class="card c6"><h2>累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
+  </div>
+</div>
 
-        <div class="row">
-          <label>掛け金（円）
-            <input id="bet" type="number" inputmode="numeric" min="0" step="100" placeholder="半角数字のみ" required />
-          </label>
+<script>
+  // ====== あなたの本番WebアプリURL ======
+  const GAS_BASE = "https://script.google.com/macros/s/AKfycbw1jiY51U3elE5tyArrcmDH0nYKtJ3N4zrnHx6TNmzojIVOl4-njJaIC7WUlcgp32sbXA/exec";
 
-          <label>回収額（円）
-            <input id="pay" type="number" inputmode="numeric" min="0" step="100" placeholder="半角数字のみ" required />
-          </label>
-        </div>
+  // ====== Utilities ======
+  const fmtJPY = (v) => new Intl.NumberFormat('ja-JP').format(v ?? 0);
+  const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
-        <p class="hint">※送信後は Entries に追加されます</p>
+  async function loadData() {
+    const url = `${GAS_BASE}?type=all&t=${Date.now()}`; // cache回避
+    const res = await fetch(url, { method: "GET" });
+    const text = await res.text();
 
-        <button id="submitBtn" type="submit">送信</button>
-        <p id="status" class="status"></p>
-      </form>
-    </section>
-  </main>
-
-  <script>
-    // ====== あなたのGAS WebアプリURL ======
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbw1jiY51U3elE5tyArrcmDH0nYKtJ3N4zrnHx6TNmzojIVOl4-njJaIC7WUlcgp32sbXA/exec";
-    const GAS_BASE = "https://script.google.com/macros/s/AKfycbw1jiY51U3elE5tyArrcmDH0nYKtJ3N4zrnHx6TNmzojIVOl4-njJaIC7WUlcgp32sbXA/exec";
-
-
-
-    // ====== Master（参加者/レース名） ======
-    const PARTICIPANTS = ["わくだ","きよもと","せきざわ","たきざわ","粗品"];
-
-    const RACES = [
-      "フェブラリーステークス（2月22日）",
-      "高松宮記念（3月29日）",
-      "大阪杯（4月5日）",
-      "桜花賞（4月12日）",
-      "皐月賞（4月19日）",
-      "天皇賞（春）（5月3日）",
-      "NHKマイルカップ（5月10日）",
-      "ヴィクトリアマイル（5月17日）",
-      "オークス（5月24日）",
-      "日本ダービー（5月31日）",
-      "安田記念（6月7日）",
-      "宝塚記念（6月14日）",
-      "スプリンターズステークス（9月27日）",
-      "秋華賞（10月18日）",
-      "菊花賞（10月25日）",
-      "天皇賞（秋）（11月1日）",
-      "エリザベス女王杯（11月15日）",
-      "マイルチャンピオンシップ（11月22日）",
-      "ジャパンカップ（11月29日）",
-      "チャンピオンズカップ（12月6日）",
-      "阪神ジュベナイルフィリーズ（12月13日）",
-      "朝日杯フューチュリティステークス（12月20日）",
-      "ホープフルステークス（12月26日）",
-      "有馬記念（12月27日）"
-    ];
-
-    // ====== DOM ======
-    const form = document.getElementById("entryForm");
-    const statusEl = document.getElementById("status");
-    const submitBtn = document.getElementById("submitBtn");
-    const nameEl = document.getElementById("name");
-    const raceEl = document.getElementById("race");
-
-    // ====== Helpers ======
-    function yen(n){
-      const x = Number(n);
-      if (!Number.isFinite(x)) return "";
-      return x.toLocaleString("ja-JP");
+    // GASが "GAS is running" を返す場合、JSONパースで落ちるので分岐
+    if (text.trim().startsWith("GAS is running")) {
+      throw new Error("GASがJSONを返していません。/exec?type=all がJSONになるようにデプロイを更新してください。");
     }
 
-    function fillSelect(selectEl, items, placeholder) {
-      selectEl.innerHTML = "";
-      const ph = document.createElement("option");
-      ph.value = "";
-      ph.textContent = placeholder;
-      selectEl.appendChild(ph);
-
-      for (const item of items) {
-        const opt = document.createElement("option");
-        opt.value = item;
-        opt.textContent = item;
-        selectEl.appendChild(opt);
-      }
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error("JSONの解析に失敗しました: " + text.slice(0, 120));
     }
 
-    // ====== 初期化：プルダウン生成 ======
-    fillSelect(nameEl, PARTICIPANTS, "参加者を選択");
-    fillSelect(raceEl, RACES, "G1レースを選択");
+    if (!json.ok) throw new Error(json.error || "GAS returned ok=false");
 
-    // ====== 送信 ======
-    form.addEventListener("submit", async (ev) => {
-      ev.preventDefault();
+    return {
+      summary: json.summary || [],
+      cumBet: json.cumBet,
+      cumProfit: json.cumProfit,
+      cumRoi: json.cumRoi
+    };
+  }
 
-      const name = nameEl.value.trim();
-      const race = raceEl.value.trim();
-      const bet  = document.getElementById("bet").value;
-      const pay  = document.getElementById("pay").value;
+  function makeBar(el, title, participants, values, isPct=false) {
+    const chart = echarts.init(document.getElementById(el));
+    const opt = {
+      backgroundColor: 'transparent',
+      grid: { left: 50, right: 18, top: 20, bottom: 45 },
+      xAxis: {
+        type: 'category',
+        data: participants,
+        axisLabel: { color: 'rgba(233,238,252,.85)', rotate: 35 }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          color: 'rgba(233,238,252,.65)',
+          formatter: (v) => isPct ? `${v}%` : fmtJPY(v)
+        },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,.08)' } }
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params) => {
+          const p = params[0];
+          const v = Number(p.value ?? 0);
+          return `${p.name}<br>${title}: <b>${isPct ? fmtPct(v) : "¥"+fmtJPY(v)}</b>`;
+        }
+      },
+      series: [{
+        type: 'bar',
+        data: values,
+        barMaxWidth: 42,
+        itemStyle: { borderRadius: [10,10,0,0] },
+        label: {
+          show: true,
+          position: 'insideTop',
+          color: 'rgba(233,238,252,.95)',
+          formatter: (p) => {
+            const v = Number(p.value ?? 0);
+            return isPct ? `${v.toFixed(0)}%` : `¥${fmtJPY(v)}`;
+          }
+        }
+      }]
+    };
+    chart.setOption(opt);
+    return chart;
+  }
 
-      if (!name || !race || bet === "" || pay === "") {
-        statusEl.textContent = "未入力の項目があります。";
-        return;
-      }
+  function makeLines(el, block, isPct=false, showZero=false) {
+    const chart = echarts.init(document.getElementById(el));
+    const dates = (block && block.dates) ? block.dates : [];
+    const legends = (block && block.series) ? Object.keys(block.series) : [];
+    const series = legends.map(name => ({
+      name,
+      type: 'line',
+      data: block.series[name],
+      smooth: true,
+      showSymbol: false,
+      lineStyle: { width: 2 },
+      emphasis: { focus: 'series' }
+    }));
 
-      submitBtn.disabled = true;
-      statusEl.textContent = "送信中…";
+    const opt = {
+      backgroundColor: 'transparent',
+      legend: {
+        data: legends,
+        top: 0,
+        textStyle: { color: 'rgba(233,238,252,.75)' }
+      },
+      grid: { left: 52, right: 18, top: 28, bottom: 42 },
+      xAxis: {
+        type: 'category',
+        data: dates,
+        axisLabel: { color: 'rgba(233,238,252,.75)', rotate: 35 }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          color: 'rgba(233,238,252,.65)',
+          formatter: (v) => isPct ? `${v}%` : fmtJPY(v)
+        },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,.08)' } }
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params) => {
+          const lines = params.map(p => {
+            const v = Number(p.value ?? 0);
+            return `${p.marker} ${p.seriesName}: <b>${isPct ? fmtPct(v) : "¥"+fmtJPY(v)}</b>`;
+          }).join('<br>');
+          return `${params[0].axisValue}<br>${lines}`;
+        }
+      },
+      series
+    };
 
-      const body = new URLSearchParams({ name, race, bet, pay }).toString();
+    if (showZero){
+      opt.series.forEach(s => (s.markLine = {
+        symbol: 'none',
+        lineStyle: { type: 'dashed', opacity: .5 },
+        data: [{ yAxis: 0 }]
+      }));
+    }
 
-      try {
-        await fetch(GAS_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-          body
-        });
+    chart.setOption(opt);
+    return chart;
+  }
 
-        statusEl.textContent = `送信OK：掛け金 ¥${yen(bet)} / 回収額 ¥${yen(pay)}`;
-        form.reset();
+  // ====== Main render ======
+  let charts = [];
 
-        // reset すると select が先頭（プレースホルダ）に戻るので、残したければここを変える
-        nameEl.value = name; // ← 参加者を保持したいならコメント外す
-        raceEl.value = race;
+  async function render() {
+    // dispose old charts (再描画対応)
+    charts.forEach(c => c && c.dispose && c.dispose());
+    charts = [];
 
-      } catch (e) {
-        statusEl.textContent = "送信に失敗しました。ネットワークやURLを確認してください。";
-      } finally {
-        submitBtn.disabled = false;
-      }
-    });
-  </script>
+    const badge = document.getElementById('updated');
+    badge.classList.remove('danger');
+
+    try {
+      const DATA = await loadData();
+
+      const participants = DATA.summary.map(d => d.participant);
+      const betValues = DATA.summary.map(d => Number(d.bet_total ?? 0));
+      const profitValues = DATA.summary.map(d => Number(d.profit_total ?? 0));
+      const roiValues = DATA.summary.map(d => Number(d.roi ?? 0));
+
+      charts.push(makeBar('barBet', '掛け金合計', participants, betValues, false));
+      charts.push(makeBar('barProfit', '収支', participants, profitValues, false));
+      charts.push(makeBar('barRoi', '回収率', participants, roiValues, true));
+
+      charts.push(makeLines('lineCumBet', DATA.cumBet, false, false));
+      charts.push(makeLines('lineCumProfit', DATA.cumProfit, false, true));
+      charts.push(makeLines('lineCumRoi', DATA.cumRoi, true, false));
+
+      badge.textContent = 'updated: ' + new Date().toLocaleString('ja-JP');
+
+      window.addEventListener('resize', () => charts.forEach(c => c.resize()));
+
+    } catch (err) {
+      badge.textContent = 'updated: ERROR';
+      badge.classList.add('danger');
+      alert("データ取得エラー:\n" + err.message + "\n\n確認:\n1) /exec?type=all がJSONを返す\n2) 使ってるURLが本番デプロイURL\n3) WebData範囲が空じゃない");
+      console.error(err);
+    }
+  }
+
+  document.getElementById('reloadBtn').addEventListener('click', render);
+  render();
+</script>
 </body>
 </html>
