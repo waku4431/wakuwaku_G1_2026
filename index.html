@@ -277,32 +277,33 @@
   const PARTICIPANTS = ["わくだ","きよもと","せきざわ","たきざわ","粗品"];
 
   // ★あなたが指定した表記に統一（これが「正」）
+// ★省略レース名（表示も処理もこれに統一）
   const RACES = [
-    "フェブラリーステークス（2月22日）",
-    "高松宮記念（3月29日）",
-    "大阪杯（4月5日）",
-    "桜花賞（4月12日）",
-    "皐月賞（4月19日）",
-    "天皇賞（春）（5月3日）",
-    "NHKマイルカップ（5月10日）",
-    "ヴィクトリアマイル（5月17日）",
-    "オークス（5月24日）",
-    "日本ダービー（5月31日）",
-    "安田記念（6月7日）",
-    "宝塚記念（6月14日）",
-    "スプリンターズステークス（9月27日）",
-    "秋華賞（10月18日）",
-    "菊花賞（10月25日）",
-    "天皇賞（秋）（11月1日）",
-    "エリザベス女王杯（11月15日）",
-    "マイルチャンピオンシップ（11月22日）",
-    "ジャパンカップ（11月29日）",
-    "チャンピオンズカップ（12月6日）",
-    "阪神ジュベナイルフィリーズ（12月13日）",
-    "朝日杯フューチュリティステークス（12月20日）",
-    "ホープフルステークス（12月26日）",
-    "有馬記念（12月27日）"
-  ];
+    "フェブラリーS",
+    "高松宮記念",
+    "大阪杯",
+    "桜花賞",
+    "皐月賞",
+    "天皇賞（春）",
+    "NHKマイルカップ",
+    "ヴィクトリアマイル",
+    "優駿牝馬（オークス）",
+    "東京優駿（日本ダービー）",
+    "安田記念",
+    "宝塚記念",
+    "スプリンターズS",
+    "秋華賞",
+    "菊花賞",
+    "天皇賞（秋）",
+    "エリザベス女王杯",
+    "マイルチャンピオンシップ",
+    "ジャパンカップ",
+    "チャンピオンズカップ",
+    "阪神ジュベナイルフィリーズ",
+    "朝日杯フューチュリティS",
+    "ホープフルS",
+    "有馬記念"
+];
 
   // ========= モバイル判定 =========
   const isMobile = () => window.innerWidth <= 420;
@@ -612,28 +613,18 @@
   // ========= 収支表（ヒートマップ） =========
 
   // ★表記ゆれ吸収キー（GASのレース名が日付あり/なし等でも同一視）
-  function normalizeRaceKey(s) {
-    if (!s) return "";
-    let t = String(s).trim();
+function normalizeRaceKey(s) {
+  if (!s) return "";
+  let t = String(s).trim();
 
-    // 例: "フェブラリーS" "フェブラリーステークス（2月22日）" "【有馬記念】" などを統一したい
-    // 1) 日付括弧を削除
-    t = t.replace(/（\d+月\d+日）/g, "");
-    // 2) 角括弧/全括弧などを削除
-    t = t.replace(/[【】\[\]\(\)（）]/g, "");
-    // 3) 全角英数→半角
-    t = t.replace(/[Ａ-Ｚａ-ｚ０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
-    // 4) 空白削除
-    t = t.replace(/\s+/g, "");
+  // 日付の括弧は落とす（入っててもOKにする）
+  t = t.replace(/（\d+月\d+日）/g, "");
 
-    // 5) よくある表記ゆれ
-    // "ステークス" -> "S"
-    t = t.replace(/ステークス/g, "S").replace(/Ｓ/g, "S");
-    // "フェブラリーS" と "フェブラリーステークス" を揃える（上でステークス→S済みなので最終的に同じになる）
-    // 例: "フェブラリーステークス" -> "フェブラリーS" みたいな揺れも、ここでは「意味が同じなら同じキー」になればOK
-
-    return t;
-  }
+  t = t.replace(/[【】\[\]]/g, "");
+  t = t.replace(/\s+/g, "");
+  t = t.replace(/ステークス/g, "S").replace(/Ｓ/g, "S");
+  return t;
+}
 
   function isTotalLabel(label) {
     const k = normalizeRaceKey(label).toUpperCase();
@@ -690,16 +681,10 @@
     const headers = rebuilt.headers;
     const rows = rebuilt.rows;
 
-    if (headers.length < 2 || rows.length === 0) {
-      return { option: null, chartWidth: 600 };
-    }
+    if (headers.length < 2 || rows.length === 0) return null;
 
     const people = headers.slice(1);
-    const races = rows.map(r => String(r[0] ?? ""));
-
-    // 合計行があるなら index を探す（無ければ -1）
-    const totalRowIndex = rows.findIndex(r => isTotalLabel(r?.[0]));
-    // rebuild時にラベルを "合計" にしてるので、見つかるのが普通
+    const races  = rows.map(r => String(r[0] ?? ""));
 
     let min = Infinity, max = -Infinity;
     const data = []; // [x, y, v]
@@ -717,51 +702,60 @@
     }
 
     const absMax = Math.max(Math.abs(min), Math.abs(max)) || 1;
+    const mobile = isMobile();
 
-    const colW = isMobile() ? 96 : 112;
-    // 左のレース名欄（ちょいコンパクト）
-    const leftW = isMobile() ? 120 : 160;
-    const chartWidth = leftW + people.length * colW + 30;
+    // ★iPhoneで横スクロールさせない設計：
+    // - 左幅は「固定ピクセル」ではなく、比率＋containLabelで収める
+    // - ラベルはトリムして収める（見切れゼロ）
+    const gridLeft = mobile ? 118 : 170;  // ここを詰める（見切れは下のwidth/overflowで防ぐ）
+    const cellH = mobile ? 22 : 24;
 
-    const cellH = isMobile() ? 24 : 26;
+    const fontName = mobile ? 11 : 12;
+    const fontRace = mobile ? 10 : 11;
+    const fontCell = mobile ? 10 : 11;
 
-    const option = {
+    // ★列幅ギリギリ：上の名前は短いので詰めてOK
+    // （EChartsは自動で割り振るので、ここはフォントとgridで攻める）
+
+    return {
       animation: false,
       backgroundColor: 'transparent',
 
       grid: {
-        top: 34,
-        left: leftW,
-        right: 16,
-        bottom: 12,
-        containLabel: false
+        top: mobile ? 44 : 48,
+        left: gridLeft,
+        right: mobile ? 10 : 14,
+        bottom: 10,
+        containLabel: true   // ★これが「見切れゼロ」の核
       },
 
       xAxis: {
         type: 'category',
         data: people,
-        position: 'top',              // ★これ追加：名前を上に
+        position: 'top',
         axisLabel: {
-          color:'rgba(233,238,252,.85)',
-          fontSize: isMobile() ? 10 : 11,
-          interval: 0
+          color:'rgba(233,238,252,.95)',
+          fontSize: fontName,
+          fontWeight: 800,
+          interval: 0,
+          padding: [0, 0, 8, 0]
         },
-        axisLine: { lineStyle: { color:'rgba(255,255,255,.14)' } },
+        axisLine: { lineStyle: { color:'rgba(255,255,255,.20)' } },
         axisTick: { alignWithLabel: true }
       },
 
-
       yAxis: {
         type: 'category',
-        data: races,
-        inverse: true, // ★ここが「逆」解消の決定打（先頭＝上）
+        data: races,         // ★日付なし＆省略名
+        inverse: true,       // 上からフェブラリーS
         axisLabel: {
-          color:'rgba(233,238,252,.78)',
-          fontSize: isMobile() ? 10 : 11,
-          formatter: (v, idx) => {
-            if (totalRowIndex >= 0 && idx === totalRowIndex) return `【${v}】`;
-            return v;
-          }
+          color:'rgba(233,238,252,.80)',
+          fontSize: fontRace,
+          margin: 10,
+          width: gridLeft - 18,     // ★ラベル領域を明示
+          overflow: 'truncate',     // ★長いのは省略表示（見切れゼロ）
+          ellipsis: '…',
+          lineHeight: mobile ? 14 : 16
         },
         axisLine: { lineStyle: { color:'rgba(255,255,255,.14)' } },
         axisTick: { show: false }
@@ -773,9 +767,7 @@
         max: absMax,
         show: false,
         calculable: false,
-        inRange: {
-          color: ['#ff6b6b', '#141a2a', '#7aa2ff'] // 赤→暗め→青
-        }
+        inRange: { color: ['#ff6b6b', '#141a2a', '#7aa2ff'] }
       },
 
       tooltip: {
@@ -800,8 +792,6 @@
           const y = api.value(1);
           const val = api.value(2);
 
-          const isTotal = (totalRowIndex >= 0 && y === totalRowIndex);
-
           const point = api.coord([x, y]);
           const size = api.size([1, 1]);
 
@@ -818,9 +808,6 @@
           const sign = val > 0 ? '+' : '';
           const text = `${sign}${fmtJPY(val)}`;
 
-          const stroke = isTotal ? 'rgba(233,238,252,.75)' : 'rgba(255,255,255,.10)';
-          const lw = isTotal ? 2 : 1;
-
           const txt = Math.abs(val) > absMax * 0.55 ? 'rgba(255,255,255,.92)' : 'rgba(233,238,252,.88)';
 
           return {
@@ -831,8 +818,8 @@
                 shape: rect,
                 style: {
                   fill: api.visual('color'),
-                  stroke,
-                  lineWidth: lw
+                  stroke: 'rgba(255,255,255,.10)',
+                  lineWidth: 1
                 }
               },
               {
@@ -842,8 +829,8 @@
                   y: rect.y + rect.height/2,
                   text,
                   fill: txt,
-                  fontSize: isMobile() ? 10 : 11,
-                  fontWeight: isTotal ? 800 : 500,
+                  fontSize: fontCell,
+                  fontWeight: 600,
                   align: 'center',
                   verticalAlign: 'middle'
                 }
@@ -853,8 +840,6 @@
         }
       }]
     };
-
-    return { option, chartWidth };
   }
 
   function makeProfitTable() {
@@ -864,9 +849,10 @@
     return {
       chart,
       set: (profitTable) => {
-        const { option, chartWidth } = buildProfitTableOption(profitTable);
-        dom.style.width = `${chartWidth}px`;
-        chart.resize();
+        const option = buildProfitTableOption(profitTable);
+
+        // ★横幅を広げない（iPhoneでもスクロールさせない）
+        dom.style.width = "100%";
 
         if (!option) {
           chart.clear();
@@ -874,12 +860,16 @@
             title: { text: '収支データがありません', left: 'center', top: 'middle',
               textStyle: { color:'rgba(233,238,252,.65)', fontSize: 12 } }
           });
+          chart.resize();
           return;
         }
-        chart.setOption(option);
+
+        chart.setOption(option, true);
+        chart.resize(); // ★描画直後に確実にリサイズ
       }
     };
   }
+
 
   // ========= 描画制御 =========
   let dashCharts = [];
