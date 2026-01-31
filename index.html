@@ -665,10 +665,10 @@
     const dom = document.getElementById("profitTable");
     const wrap = document.getElementById("profitTableWrap");
     const avail = wrap?.clientWidth || window.innerWidth;
-    const safeAvail = Math.max(260, avail - 8);
+    const safeAvail = Math.max(260, avail - 2);
 
     if (isMobile() && designWidth > safeAvail) {
-      const s = Math.max(0.72, Math.min(1, safeAvail / designWidth));
+      const s = Math.max(0.86, Math.min(1, safeAvail / designWidth));
       dom.style.transform = `scale(${s})`;
       dom.style.width = `${designWidth}px`;
     } else {
@@ -709,8 +709,8 @@
     const mobile = isMobile();
 
     // ★ギリギリまで詰める（スマホは特に）
-    const leftW = mobile ? 118 : 170;
-    const colW  = mobile ? 72  : 112;
+    const leftW = mobile ? 132 : 170;
+    const colW  = mobile ? 82  : 112;
     const designWidth = leftW + colW * people.length + (mobile ? 16 : 20);
 
     const cellH = mobile ? 22 : 24;
