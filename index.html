@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>わくわくG1サイト 2026</title>
 
-  <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 
   <style>
@@ -48,16 +47,17 @@
     }
 
     .wrap{max-width:1200px; margin:0 auto; padding:10px 12px 26px;}
+
+    /* ★カード内余白をさらに詰めてグラフ領域を増やす */
     .card{
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
       border:1px solid var(--border);
       border-radius:16px;
-      padding:10px; /* 余白を減らす */
+      padding:8px;            /* 10 -> 8 */
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
       overflow:hidden;
     }
 
-    /* Input layout */
     .form{
       display:grid;
       gap:10px;
@@ -73,7 +73,7 @@
       background: rgba(0,0,0,.20);
       color:var(--text);
       outline:none;
-      font-size:16px; /* iPhoneの拡大対策 */
+      font-size:16px;
     }
     input::placeholder{color:rgba(233,238,252,.45);}
     .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
@@ -101,7 +101,6 @@
     .hidden{display:none !important;}
     .hint{font-size:12px; color:rgba(233,238,252,.65);}
 
-    /* Dashboard layout */
     .grid{
       display:grid; gap:12px;
       grid-template-columns: repeat(12, 1fr);
@@ -113,18 +112,17 @@
     .c5{grid-column: span 4;}
     .c6{grid-column: span 4;}
 
-    /* グラフを大きく */
-    .chart{width:100%; height:330px;}
-    .chartTall{width:100%; height:370px;}
+    /* ★グラフの高さを微調整（スマホで“デカすぎず小さすぎず”） */
+    .chart{width:100%; height:320px;}
+    .chartTall{width:100%; height:360px;}
 
     @media (max-width: 900px){
       .form{grid-template-columns: 1fr;}
       .c1,.c2,.c3,.c4,.c5,.c6{grid-column: span 12;}
-      .chart{height:305px;}
-      .chartTall{height:345px;}
+      .chart{height:295px;}
+      .chartTall{height:335px;}
     }
 
-    /* History link cards */
     a.linkcard{
       display:block;
       flex:1;
@@ -151,10 +149,7 @@
 
 <body>
 <header>
-  <div>
-    <h1>わくわくG1サイト 2026</h1>
-  </div>
-
+  <div><h1>わくわくG1サイト 2026</h1></div>
   <div class="tabs">
     <button class="tabbtn active" data-tab="input">入力</button>
     <button class="tabbtn" data-tab="dashboard">ダッシュボード</button>
@@ -216,13 +211,13 @@
     </div>
 
     <div class="grid">
-      <div class="card c1"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">掛け金合計 [円]</h2><div id="barBet" class="chart"></div></div>
-      <div class="card c2"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">収支 [円]</h2><div id="barProfit" class="chart"></div></div>
-      <div class="card c3"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">回収率 [%]</h2><div id="barRoi" class="chart"></div></div>
+      <div class="card c1"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">掛け金合計 [円]</h2><div id="barBet" class="chart"></div></div>
+      <div class="card c2"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">収支 [円]</h2><div id="barProfit" class="chart"></div></div>
+      <div class="card c3"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">回収率 [%]</h2><div id="barRoi" class="chart"></div></div>
 
-      <div class="card c4"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
-      <div class="card c5"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積収支 [円] <span class="hint">0ライン</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
-      <div class="card c6"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
+      <div class="card c4"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
+      <div class="card c5"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積収支 [円] <span class="hint">0ライン</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
+      <div class="card c6"><h2 style="margin:0 0 6px; color:var(--muted); font-size:13px;">累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
     </div>
   </section>
 
@@ -243,15 +238,13 @@
         </a>
       </div>
 
-      <div class="hint" style="margin-top:10px;">
-        ※リンクは新しいタブで開きます
-      </div>
+      <div class="hint" style="margin-top:10px;">※リンクは新しいタブで開きます</div>
     </div>
   </section>
 </div>
 
 <script>
-  // ========= あなたの本番WebアプリURL =========
+  // ========= 本番WebアプリURL =========
   const GAS_BASE = "https://script.google.com/macros/s/AKfycbw1jiY51U3elE5tyArrcmDH0nYKtJ3N4zrnHx6TNmzojIVOl4-njJaIC7WUlcgp32sbXA/exec";
 
   // ========= マスタ =========
@@ -286,7 +279,7 @@
   // ========= モバイル判定 =========
   const isMobile = () => window.innerWidth <= 420;
 
-  // ========= 参加者ごとの色（固定） =========
+  // ========= 色固定 =========
   const COLOR_MAP = {
     "わくだ":   "#7aa2ff",
     "きよもと": "#ffd166",
@@ -301,13 +294,13 @@
     const map = {};
     for (const s of RACES) {
       const m = s.match(/^(.+?)（(.+?)）$/);
-      if (m) map[m[2]] = m[1]; // key="9月27日", value="スプリンターズステークス"
+      if (m) map[m[2]] = m[1];
     }
     return map;
   })();
   const getRaceNameByDate = (d) => RACE_BY_DATE[d] || "";
 
-  // ========= Dashboard データ先読みキャッシュ（体感速度UP） =========
+  // ========= 先読みキャッシュ =========
   let cachedAllData = null;
   let cachedAllDataAt = 0;
   let prefetchPromise = null;
@@ -323,10 +316,8 @@
 
   async function getAllDataFast() {
     const now = Date.now();
+    if (cachedAllData && (now - cachedAllDataAt) < CACHE_MS) return cachedAllData;
 
-    if (cachedAllData && (now - cachedAllDataAt) < CACHE_MS) {
-      return cachedAllData;
-    }
     if (prefetchPromise) {
       const data = await prefetchPromise;
       cachedAllData = data;
@@ -334,6 +325,7 @@
       prefetchPromise = null;
       return data;
     }
+
     prefetchPromise = loadData();
     const data = await prefetchPromise;
     cachedAllData = data;
@@ -377,7 +369,6 @@
       document.getElementById("keepAmount").checked = !!s.keepAmount;
       if (s.name) document.getElementById("name").value = s.name;
       if (s.race) document.getElementById("race").value = s.race;
-
       if (s.keepAmount) {
         if (s.bet !== undefined) document.getElementById("bet").value = s.bet;
         if (s.pay !== undefined) document.getElementById("pay").value = s.pay;
@@ -394,24 +385,19 @@
     document.getElementById("tab-dashboard").classList.toggle("hidden", tabName !== "dashboard");
     document.getElementById("tab-history").classList.toggle("hidden", tabName !== "history");
     localStorage.setItem("waku_g1_active_tab", tabName);
-
     if (tabName !== "dashboard") prefetchAllData();
   }
 
   // ========= POST =========
   async function postEntry({name, race, bet, pay}) {
     const body = new URLSearchParams({ name, race, bet: String(bet), pay: String(pay) });
-
     const res = await fetch(GAS_BASE, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
       body
     });
-
     const text = (await res.text()).trim();
-    if (!res.ok || !text.startsWith("OK")) {
-      throw new Error("POST失敗: " + text);
-    }
+    if (!res.ok || !text.startsWith("OK")) throw new Error("POST失敗: " + text);
     return text;
   }
 
@@ -419,18 +405,20 @@
   const fmtJPY = (v) => new Intl.NumberFormat('ja-JP').format(v ?? 0);
   const fmtPct = (v) => `${Number(v ?? 0).toFixed(2)}%`;
 
+  // ★余白最適化（左と下をさらに詰める）
   function getChartLayout() {
     const mobile = isMobile();
     return {
       mobile,
 
-      // ★左・下の余白を詰める
-      gridLeft:  mobile ? 42 : 48,
-      gridRight: mobile ? 12 : 14,
-      gridBottomBar:  mobile ? 34 : 40,
-      gridBottomLine: mobile ? 28 : 36,
+      gridLeft:  mobile ? 36 : 46,  // 左を詰める
+      gridRight: mobile ? 10 : 14,
+      gridTopBar: 18,
+      gridTopLine: 30,
 
-      // ★軸フォントを少し小さく
+      gridBottomBar:  mobile ? 32 : 40,
+      gridBottomLine: mobile ? 26 : 34, // 下を詰める
+
       fontAxis: mobile ? 9 : 11,
       fontLegend: mobile ? 10 : 12,
       axisMargin: mobile ? 6 : 8,
@@ -445,7 +433,7 @@
 
     chart.setOption({
       backgroundColor:'transparent',
-      grid:{ left:L.gridLeft, right:L.gridRight, top:18, bottom:L.gridBottomBar, containLabel:true },
+      grid:{ left:L.gridLeft, right:L.gridRight, top:L.gridTopBar, bottom:L.gridBottomBar, containLabel:true },
       xAxis:{
         type:'category',
         data:participants,
@@ -492,19 +480,20 @@
     return chart;
   }
 
+  // ★折れ線：横軸は「レース回数」、表示は偶数だけ、ただしラベル自体は表示する
   function makeLines(el, block, isPct=false, showZero=false) {
     const chart = echarts.init(document.getElementById(el));
     const L = getChartLayout();
 
     const dates = block?.dates ?? [];
-    const xLabels = dates.map((_, i) => String(i + 1)); // ★G1回数（1,2,3...）
+    const xLabels = dates.map((_, i) => String(i + 1)); // 1..N
 
     const legends = block?.series ? Object.keys(block.series) : [];
     const series = legends.map(name => ({
       name,
       type:'line',
       data:block.series[name],
-      smooth:false,      // ★直線
+      smooth:false,
       showSymbol:false,
       lineStyle:{ width:2, color:getColor(name) },
       emphasis:{ focus:'series' }
@@ -520,19 +509,36 @@
         itemHeight:8,
         textStyle:{ color:'rgba(233,238,252,.75)', fontSize:L.fontLegend }
       },
-      grid:{ left:L.gridLeft, right:L.gridRight, top:30, bottom:L.gridBottomLine, containLabel:true },
+      grid:{ left:L.gridLeft, right:L.gridRight, top:L.gridTopLine, bottom:L.gridBottomLine, containLabel:true },
       xAxis:{
         type:'category',
         data:xLabels,
         boundaryGap:false,
         axisTick:{ alignWithLabel:true },
+
         axisLabel:{
           color:'rgba(233,238,252,.75)',
-          rotate:0,
           fontSize:L.fontAxis,
           margin:6,
-          interval:0,
-          hideOverlap:true
+
+          // ★偶数だけ表示（2,4,6...）
+          // ただし 1 と 最後 は出す（端が分からなくなるの防止）
+          interval: 0,
+          formatter: (val, idx) => {
+            const n = Number(val);
+            const last = xLabels.length;
+            if (n === 1 || n === last) return String(n);
+            return (n % 2 === 0) ? String(n) : "";
+          }
+        },
+
+        // ★横軸タイトル（ラベル）を表示
+        name: "レース回数",
+        nameLocation: "middle",
+        nameGap: L.mobile ? 20 : 24,
+        nameTextStyle:{
+          color:'rgba(233,238,252,.65)',
+          fontSize: L.mobile ? 10 : 12
         }
       },
       yAxis:{
@@ -601,13 +607,10 @@
 
     if (!resizeBound) {
       resizeBound = true;
-      window.addEventListener("resize", () => {
-        charts.forEach(c => c?.resize?.());
-      });
+      window.addEventListener("resize", () => charts.forEach(c => c?.resize?.()));
     }
   }
 
-  // ========= 初期化 =========
   function fillSelect(id, items) {
     const sel = document.getElementById(id);
     sel.innerHTML = "";
@@ -629,7 +632,6 @@
 
   loadFormState();
 
-  // 初回表示後に先読み（体感速度UP）
   setTimeout(prefetchAllData, 0);
 
   const savedTab = localStorage.getItem("waku_g1_active_tab");
@@ -656,7 +658,7 @@
 
   document.getElementById("reloadBtn").addEventListener("click", async () => {
     try {
-      cachedAllDataAt = 0; // 強制更新
+      cachedAllDataAt = 0;
       await renderDashboard();
     } catch (e) {
       alert("再読み込みエラー: " + e.message);
