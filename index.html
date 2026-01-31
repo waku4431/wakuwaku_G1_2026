@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>wakuwaku G1 2026</title>
+  <title>わくわくG1サイト 2026</title>
 
   <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
@@ -132,20 +132,47 @@
     .hidden{display:none !important;}
     .hint{font-size:12px; color:rgba(233,238,252,.65);}
     .ok{color:#9be39b;}
+
+    /* History link cards */
+    a.linkcard{
+      display:block;
+      flex:1;
+      min-width: 240px;
+      text-decoration:none;
+      color: var(--text);
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      border-radius:16px;
+      padding:14px;
+    }
+    a.linkcard:hover{
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.18);
+    }
+    .linktitle{
+      font-weight:800;
+      margin-bottom:6px;
+    }
+    .linkurl{
+      font-size:12px;
+      color: rgba(233,238,252,.65);
+      word-break: break-all;
+    }
   </style>
 </head>
 
 <body>
 <header>
   <div>
-    <h1>wakuwaku G1 2026</h1>
-    <div class="sub">入力 → Entriesへ保存 / 集計 → WebData → ECharts</div>
+    <h1>わくわくG1サイト 2026</h1>
+    <!-- サブ説明は不要なので削除 -->
   </div>
 
   <div class="tabs">
     <button class="tabbtn active" data-tab="input">入力</button>
     <button class="tabbtn" data-tab="dashboard">ダッシュボード</button>
-    <span class="badge" id="status">ready</span>
+    <button class="tabbtn" data-tab="history">History</button>
+    <!-- readyバッジは不要なので削除 -->
   </div>
 </header>
 
@@ -154,7 +181,7 @@
   <section id="tab-input" class="card">
     <div class="row" style="justify-content:space-between; margin-bottom:8px;">
       <div class="hint">
-        送信後も <b>参加者/レース</b> を保持。金額も保持したい場合は下の設定をON。
+        送信後も <b>参加者/レース</b> を保持。金額も保持したい場合は右の設定をON。
       </div>
       <label class="row" style="margin:0; gap:8px;">
         <input id="keepAmount" type="checkbox" style="width:auto; transform:scale(1.1);" />
@@ -187,7 +214,6 @@
         <button class="btn primary" type="submit">送信</button>
         <div class="row">
           <button class="btn" type="button" id="toDash">ダッシュボードへ</button>
-          <button class="btn" type="button" id="clearLocal">入力保持をリセット</button>
         </div>
       </div>
     </form>
@@ -211,6 +237,29 @@
       <div class="card c4"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積掛け金 [円]</h2><div id="lineCumBet" class="chartTall"></div></div>
       <div class="card c5"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積収支 [円] <span class="hint">0ライン</span></h2><div id="lineCumProfit" class="chartTall"></div></div>
       <div class="card c6"><h2 style="margin:0 0 8px; color:var(--muted); font-size:13px;">累積回収率 [%]</h2><div id="lineCumRoi" class="chartTall"></div></div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="tab-history" class="hidden">
+    <div class="card">
+      <h2 style="margin:0 0 10px; color:var(--muted); font-size:13px;">過去の結果</h2>
+
+      <div class="row" style="gap:12px;">
+        <a class="linkcard" href="https://waku4431.github.io/wakuwaku_G1/" target="_blank" rel="noopener">
+          <div class="linktitle">2025（去年のサイト）</div>
+          <div class="linkurl">https://waku4431.github.io/wakuwaku_G1/</div>
+        </a>
+
+        <a class="linkcard" href="https://docs.google.com/spreadsheets/d/1V1nxbAoVL6SjKAgII8QPmEYw8A5YI-tZUzYFDhKDx1Y/edit?gid=614154890#gid=614154890" target="_blank" rel="noopener">
+          <div class="linktitle">2024（スプレッドシート）</div>
+          <div class="linkurl">https://docs.google.com/spreadsheets/d/1V1nxbAoVL6SjKAgII8QPmEYw8A5YI-tZUzYFDhKDx1Y/</div>
+        </a>
+      </div>
+
+      <div class="hint" style="margin-top:10px;">
+        ※リンクは新しいタブで開きます
+      </div>
     </div>
   </section>
 </div>
@@ -279,10 +328,6 @@
     } catch {}
   }
 
-  function clearFormState() {
-    localStorage.removeItem(LS_KEY);
-  }
-
   // ========= タブ切り替え =========
   function setTab(tabName) {
     document.querySelectorAll(".tabbtn").forEach(b => {
@@ -290,16 +335,12 @@
     });
     document.getElementById("tab-input").classList.toggle("hidden", tabName !== "input");
     document.getElementById("tab-dashboard").classList.toggle("hidden", tabName !== "dashboard");
-    // タブ状態も保存（任意）
+    document.getElementById("tab-history").classList.toggle("hidden", tabName !== "history");
     localStorage.setItem("waku_g1_active_tab", tabName);
   }
 
   // ========= POST（Entriesへ追加） =========
   async function postEntry({name, race, bet, pay}) {
-    const status = document.getElementById("status");
-    status.textContent = "sending...";
-    status.classList.remove("danger");
-
     // Apps Script は doPost(e.parameter...) なので URL-encoded で送るのが確実
     const body = new URLSearchParams({ name, race, bet: String(bet), pay: String(pay) });
 
@@ -311,11 +352,8 @@
 
     const text = (await res.text()).trim();
     if (!res.ok || !text.startsWith("OK")) {
-      status.textContent = "ERROR";
-      status.classList.add("danger");
       throw new Error("POST失敗: " + text);
     }
-    status.textContent = "OK";
     return text;
   }
 
@@ -464,9 +502,9 @@
   // 保存済み復元
   loadFormState();
 
-  // タブ：前回状態復元
+  // タブ：前回状態復元（input/dashboard/history）
   const savedTab = localStorage.getItem("waku_g1_active_tab");
-  if (savedTab === "dashboard") setTab("dashboard");
+  if (savedTab === "dashboard" || savedTab === "history") setTab(savedTab);
 
   // タブボタン
   document.querySelectorAll(".tabbtn").forEach(btn => {
@@ -496,12 +534,6 @@
     catch (e) { alert("再読み込みエラー: " + e.message); }
   });
 
-  // 入力保持リセット
-  document.getElementById("clearLocal").addEventListener("click", () => {
-    clearFormState();
-    alert("入力保持をリセットしました");
-  });
-
   // 送信
   document.getElementById("entryForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -514,8 +546,8 @@
     try {
       await postEntry({ name, race, bet, pay });
 
-      // ✅ 送信後に入力が消える問題：ここで reset しない（保持）
-      // ただし「金額は保持しない」設定なら bet/pay だけクリア
+      // 送信後も参加者/レースは保持
+      // 「金額も保持」OFFなら bet/pay だけクリア
       const keepAmount = document.getElementById("keepAmount").checked;
       if (!keepAmount) {
         document.getElementById("bet").value = "";
@@ -525,8 +557,9 @@
       // 状態保存（次回も保持）
       saveFormState();
 
-      // おまけ：すぐダッシュボード反映したいならON
-      // setTab("dashboard"); await renderDashboard();
+      // 送信完了の軽い通知
+      // alertを使いたくなければ消してOK
+      // alert("送信しました");
 
     } catch (e) {
       alert(e.message);
