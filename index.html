@@ -956,48 +956,59 @@
     });
   }
 
-  // ★★★★★ ここが「並び順固定＆入れ替わり防止」の核心 ★★★★★
-  async function renderDashboard() {
-    dashCharts.forEach(c => safeDispose(c));
-    dashCharts = [];
+async function renderDashboard() {
+  dashCharts.forEach(c => safeDispose(c));
+  dashCharts = [];
 
-    const updated = document.getElementById("updatedDash");
-    updated.textContent = "updated: loading...";
+  const updated = document.getElementById("updatedDash");
+  updated.textContent = "updated: loading...";
 
-    await nextPaint();
+  // ★表示直後のDOM確定待ち（初回描画失敗対策）
+  await nextPaint();
 
-    const data = await getAllDataFast();
+  const data = await getAllDataFast();
 
-    // ① GASのsummaryを Map 化（participant → データ）
-    const summaryMap = new Map(
-      (data.summary ?? []).map(d => [String(d.participant ?? "").trim(), d])
-    );
+  // ★表示順は固定（たきざわを一番右にしたいなら最後にしておく）
+  const participants = PARTICIPANTS.slice();
 
-    // ② 表示順は PARTICIPANTS の順で固定
-    const participants = PARTICIPANTS.slice();
+  // ★累積ブロックから「最後の値」を取り出す
+  // 例: data.cumBet.series["かば"] の末尾 = 累積掛け金合計
+  const lastOf = (block, name) => {
+    const arr = block?.series?.[name];
+    if (!Array.isArray(arr) || arr.length === 0) return 0;
+    const v = Number(arr[arr.length - 1] ?? 0);
+    return Number.isFinite(v) ? v : 0;
+  };
 
-    // ③ participants と同じ順の「orderedSummary」を作る（←ズレ防止の決定打）
-    const orderedSummary = participants.map(p => summaryMap.get(p) ?? {
-      participant: p,
-      bet_total: 0,
-      profit_total: 0,
-      roi: 0
-    });
+  // ★棒グラフは summary を使わず cum*** の最終値から作る（入れ替わり対策）
+  const betVals = participants.map(p => lastOf(data.cumBet, p));
+  const profitVals = participants.map(p => lastOf(data.cumProfit, p));
 
-    // ④ 棒グラフ：participants と orderedSummary の index が一致するので入れ替わらない
-    dashCharts.push(makeBar("barBet", "掛け金合計", participants, orderedSummary.map(d=>Number(d.bet_total??0)), false));
-    dashCharts.push(makeBar("barProfit", "収支", participants, orderedSummary.map(d=>Number(d.profit_total??0)), false));
-    dashCharts.push(makeBar("barRoi", "回収率", participants, orderedSummary.map(d=>Number(d.roi??0)), true));
+  // 回収率：cumRoiの最終値が取れればそれ、ダメなら (pay/bet)*100
+  const roiVals = participants.map(p => {
+    const r = lastOf(data.cumRoi, p);
+    if (Number.isFinite(r) && r !== 0) return r;
 
-    // 折れ線はGAS側のseries順のまま（必要ならここも揃えられる）
-    dashCharts.push(makeLines("lineCumBet", data.cumBet, false, false));
-    dashCharts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
-    dashCharts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
+    const bet = lastOf(data.cumBet, p);
+    const profit = lastOf(data.cumProfit, p);
+    const pay = bet + profit;
+    return bet > 0 ? (pay / bet * 100) : 0;
+  });
 
-    updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
+  // ===== 棒グラフ =====
+  dashCharts.push(makeBar("barBet", "掛け金合計", participants, betVals, false));
+  dashCharts.push(makeBar("barProfit", "収支", participants, profitVals, false));
+  dashCharts.push(makeBar("barRoi", "回収率", participants, roiVals, true));
 
-    if (!resizeBound) bindResize();
-  }
+  // ===== 折れ線（そのまま）=====
+  dashCharts.push(makeLines("lineCumBet", data.cumBet, false, false));
+  dashCharts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
+  dashCharts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
+
+  updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
+
+  if (!resizeBound) bindResize();
+}
 
   async function renderTable() {
     const updated = document.getElementById("updatedTable");
