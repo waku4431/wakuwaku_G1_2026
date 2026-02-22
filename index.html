@@ -89,6 +89,10 @@
       border-color: rgba(122,162,255,.6);
       background: rgba(122,162,255,.18);
     }
+    .btn:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
     .badge{
       border:1px solid var(--border);
       padding:6px 10px;
@@ -155,6 +159,43 @@
       color: rgba(233,238,252,.65);
       word-break: break-all;
     }
+
+    /* ===== トースト ===== */
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 40px;
+      transform: translateX(-50%) translateY(18px);
+      background: rgba(10,14,26,.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(122,162,255,.35);
+      color: var(--text);
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-size: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.5);
+      opacity: 0;
+      transition: all .25s ease;
+      z-index: 9999;
+      max-width: calc(100vw - 24px);
+      display:flex;
+      align-items:center;
+      gap:10px;
+      pointer-events:none;
+    }
+    .toast.show{
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.success{ border-color: rgba(122,162,255,.65); }
+    .toast.error{ border-color: rgba(255,107,107,.75); }
+    .toast .dot{
+      width:10px;height:10px;border-radius:50%;
+      background: rgba(122,162,255,.85);
+      flex: 0 0 auto;
+    }
+    .toast.error .dot{ background: rgba(255,107,107,.9); }
+    .toast .msg{ line-height:1.3; }
   </style>
 </head>
 
@@ -195,11 +236,13 @@
 
       <div>
         <label>掛け金（円）</label>
+        <!-- ★ 10円刻み -->
         <input id="bet" type="number" inputmode="numeric" min="0" step="10" placeholder="例: 1000" required />
       </div>
 
       <div>
         <label>回収額（円）</label>
+        <!-- ★ 10円刻み -->
         <input id="pay" type="number" inputmode="numeric" min="0" step="10" placeholder="例: 0" required />
       </div>
 
@@ -271,6 +314,12 @@
       <div class="hint" style="margin-top:10px;">※リンクは新しいタブで開きます</div>
     </div>
   </section>
+</div>
+
+<!-- ★トースト本体 -->
+<div id="toast" class="toast" aria-live="polite" aria-atomic="true">
+  <div class="dot"></div>
+  <div class="msg"></div>
 </div>
 
 <script>
@@ -404,6 +453,29 @@
         })
         .finally(() => { prefetchPromise = null; });
     }
+  }
+
+  // ========= トースト =========
+  let toastTimerHide = null;
+  let toastTimerShow = null;
+
+  function showToast(message, type="success", durationMs=2200) {
+    const toast = document.getElementById("toast");
+    const msg = toast.querySelector(".msg");
+    msg.textContent = message;
+
+    toast.classList.remove("success","error","show");
+    toast.classList.add(type === "error" ? "error" : "success");
+
+    if (toastTimerHide) clearTimeout(toastTimerHide);
+    if (toastTimerShow) clearTimeout(toastTimerShow);
+
+    // 連続表示でもアニメが走るように微delay
+    toastTimerShow = setTimeout(() => toast.classList.add("show"), 10);
+
+    toastTimerHide = setTimeout(() => {
+      toast.classList.remove("show");
+    }, Math.max(800, durationMs));
   }
 
   // ========= 入力保持 =========
@@ -1046,6 +1118,7 @@
     }
   });
 
+  // ========= 送信（トースト対応・二重送信防止） =========
   document.getElementById("entryForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
 
@@ -1054,7 +1127,13 @@
     const bet  = Number(document.getElementById("bet").value || 0);
     const pay  = Number(document.getElementById("pay").value || 0);
 
+    const btn = ev.submitter;
+
     try {
+      if (btn) btn.disabled = true;
+
+      showToast("送信中…", "success", 1200);
+
       await postEntry({ name, race, bet, pay });
 
       const keepAmount = document.getElementById("keepAmount").checked;
@@ -1066,8 +1145,13 @@
       saveFormState();
       prefetchAllData();
 
+      showToast("送信が完了しました ✅", "success", 2200);
+
     } catch (e) {
+      showToast("送信に失敗しました ❌", "error", 2600);
       alert(e.message);
+    } finally {
+      if (btn) btn.disabled = false;
     }
   });
 </script>
