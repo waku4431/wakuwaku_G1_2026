@@ -399,6 +399,13 @@
   const getColor = (name) => COLOR_MAP[name] || "#7aa2ff";
 
   // ========= 日付 -> レース名 =========
+  function getShortRaceNameForToast(raceFull) {
+  // "フェブラリーステークス（2月22日）" → "フェブラリーステークス"
+  const m = String(raceFull ?? "").match(/^(.+?)（.+?）$/);
+  const base = m ? m[1] : String(raceFull ?? "");
+  // 省略名（TABLE_RACES側）へ寄せる
+  return toDisplayRaceName(base);
+}
   const RACE_BY_DATE = (() => {
     const map = {};
     for (const s of RACES) {
@@ -1146,6 +1153,10 @@
       prefetchAllData();
 
       showToast("送信が完了しました ✅", "success", 2200);
+      const shortRace = getShortRaceNameForToast(race);
+      const profit = pay - bet;
+      const sign = profit > 0 ? "+" : "";
+      showToast(`送信完了 ✅ ${name} / ${shortRace} / ${sign}${fmtJPY(profit)}円`, "success", 2600);
 
     } catch (e) {
       showToast("送信に失敗しました ❌", "error", 2600);
