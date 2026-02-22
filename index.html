@@ -120,7 +120,7 @@
 
     /* 収支表タブ */
     .tableWrap{
-      overflow-x:hidden; /* ★スマホでも横スクロールさせない（崩れない設計にする） */
+      overflow-x:hidden;
       -webkit-overflow-scrolling:touch;
       border-radius:12px;
       width:100%;
@@ -327,9 +327,10 @@
   const GAS_BASE = "https://script.google.com/macros/s/AKfycbw1jiY51U3elE5tyArrcmDH0nYKtJ3N4zrnHx6TNmzojIVOl4-njJaIC7WUlcgp32sbXA/exec";
 
   // ========= マスタ =========
+  // ★ここが表示順（たきざわを一番右にしたいなら最後）
   const PARTICIPANTS = ["わくだ","きよもと","せきざわ","かば","たきざわ"];
 
-  // 入力用（あなたの元の表示そのまま）
+  // 入力用（表示そのまま）
   const RACES = [
     "フェブラリーステークス（2月22日）",
     "高松宮記念（3月29日）",
@@ -357,7 +358,7 @@
     "有馬記念（12月27日）"
   ];
 
-  // 収支表（表示用）: 日付なし・省略名（あなたの指定）
+  // 収支表（表示用）: 日付なし・省略名
   const TABLE_RACES = [
     "フェブラリーS",
     "高松宮記念",
@@ -393,19 +394,12 @@
     "わくだ":   "#7aa2ff",
     "きよもと": "#ffd166",
     "せきざわ": "#ff6b6b",
-    "かば": "#6ee7b7",
-    "たきざわ":     "#a78bfa",
+    "たきざわ": "#6ee7b7",
+    "かば":     "#a78bfa",
   };
   const getColor = (name) => COLOR_MAP[name] || "#7aa2ff";
 
   // ========= 日付 -> レース名 =========
-  function getShortRaceNameForToast(raceFull) {
-  // "フェブラリーステークス（2月22日）" → "フェブラリーステークス"
-  const m = String(raceFull ?? "").match(/^(.+?)（.+?）$/);
-  const base = m ? m[1] : String(raceFull ?? "");
-  // 省略名（TABLE_RACES側）へ寄せる
-  return toDisplayRaceName(base);
-}
   const RACE_BY_DATE = (() => {
     const map = {};
     for (const s of RACES) {
@@ -477,7 +471,6 @@
     if (toastTimerHide) clearTimeout(toastTimerHide);
     if (toastTimerShow) clearTimeout(toastTimerShow);
 
-    // 連続表示でもアニメが走るように微delay
     toastTimerShow = setTimeout(() => toast.classList.add("show"), 10);
 
     toastTimerHide = setTimeout(() => {
@@ -551,24 +544,20 @@
     try { chart?.dispose?.(); } catch {}
   }
 
-  // ★余白最適化（左と下をさらに詰める）
+  // ★余白最適化
   function getChartLayout() {
     const mobile = isMobile();
     return {
       mobile,
-
       gridLeft:  mobile ? 5 : 46,
       gridRight: mobile ? 10 : 14,
       gridTopBar: 18,
       gridTopLine: 30,
-
       gridBottomBar:  mobile ? 32 : 40,
       gridBottomLine: mobile ? 15 : 34,
-
       fontAxis: mobile ? 9 : 11,
       fontLegend: mobile ? 10 : 12,
       axisMargin: mobile ? 6 : 8,
-
       rotateBarX: 35
     };
   }
@@ -724,22 +713,14 @@
 
   // ========= 収支表（ヒートマップ） =========
 
-  // ★重要修正：
-  // 以前の normalize は /（.*?）/ を消してしまい
-  // 天皇賞（春）と天皇賞（秋）がどちらも「天皇賞」になって衝突 → 片方が潰れる
-  // → 日付括弧（◯月◯日を含む括弧）だけ除去する
   const normalize = (s) => String(s ?? "")
-    .replace(/（[^）]*\d+月\d+日[^）]*）/g, "")  // 日付括弧だけ除去
+    .replace(/（[^）]*\d+月\d+日[^）]*）/g, "")
     .replace(/\s+/g, "")
     .trim();
 
   const RACE_ALIAS = (() => {
     const m = new Map();
-
-    // 基本（表示名→表示名）
     TABLE_RACES.forEach(r => m.set(normalize(r), r));
-
-    // よくある揺れ（必要に応じて増やせる）
     m.set(normalize("フェブラリーステークス"), "フェブラリーS");
     m.set(normalize("スプリンターズステークス"), "スプリンターズS");
     m.set(normalize("朝日杯フューチュリティステークス"), "朝日杯フューチュリティS");
@@ -748,20 +729,23 @@
     m.set(normalize("日本ダービー"), "東京優駿（日本ダービー）");
     m.set(normalize("東京優駿"), "東京優駿（日本ダービー）");
     m.set(normalize("優駿牝馬"), "優駿牝馬（オークス）");
-
-    // 念のため（GAS側が括弧なし表記でも拾う）
     m.set(normalize("天皇賞春"), "天皇賞（春）");
     m.set(normalize("天皇賞秋"), "天皇賞（秋）");
-
     return m;
   })();
 
   function toDisplayRaceName(raw) {
     const key = normalize(raw);
-    return RACE_ALIAS.get(key) || raw; // マッチしない場合はそのまま
+    return RACE_ALIAS.get(key) || raw;
   }
 
-  // ★順番はTABLE_RACESで固定（GASのrows順は無視する）
+  // ★トースト用：入力の「フェブラリーステークス（2月22日）」→「フェブラリーS」
+  function getShortRaceNameForToast(raceFull) {
+    const m = String(raceFull ?? "").match(/^(.+?)（.+?）$/);
+    const base = m ? m[1] : String(raceFull ?? "");
+    return toDisplayRaceName(base);
+  }
+
   function sortProfitRowsByMaster(profitTable) {
     const headers = profitTable?.headers ?? [];
     const rows = (profitTable?.rows ?? []).slice();
@@ -769,7 +753,6 @@
 
     const peopleCount = headers.length - 1;
 
-    // rowsを表示名でMap化
     const rowMap = new Map();
     for (const r of rows) {
       const rawRace = String(r?.[0] ?? "");
@@ -779,7 +762,6 @@
       rowMap.set(disp, copied);
     }
 
-    // TABLE_RACES順で埋める（欠けは0埋め）
     const sorted = TABLE_RACES.map(raceName => {
       if (rowMap.has(raceName)) return rowMap.get(raceName);
       return [raceName, ...Array(peopleCount).fill(0)];
@@ -801,7 +783,7 @@
     const races = rows.map(r => String(r[0] ?? ""));
 
     let min = Infinity, max = -Infinity;
-    const data = []; // [x, y, v]
+    const data = [];
 
     for (let y = 0; y < rows.length; y++) {
       const r = rows[y];
@@ -816,20 +798,14 @@
     }
 
     const absMax = Math.max(Math.abs(min), Math.abs(max)) || 1;
-
     const mobile = isMobile();
-
-    // ★iPhoneで横スクロールなしで「収める」前提のレイアウト
     const leftW = mobile ? 96 : 160;
     const gridRight = mobile ? 4 : 16;
-
     const cellH = mobile ? 24 : 26;
 
     const option = {
       animation: false,
       backgroundColor: 'transparent',
-
-      // ★名前（参加者）を上に出すので top を増やす
       grid: {
         top: mobile ? 54 : 58,
         left: leftW,
@@ -837,8 +813,6 @@
         bottom: 10,
         containLabel: false
       },
-
-      // ★参加者名を「表の一番上」に出す（見た目: ヘッダ行）
       xAxis: {
         type: 'category',
         data: people,
@@ -853,8 +827,6 @@
         axisLine: { lineStyle: { color:'rgba(255,255,255,.18)' } },
         axisTick: { alignWithLabel: true }
       },
-
-      // ★時系列の逆転を起こさないよう固定
       yAxis: {
         type: 'category',
         data: races,
@@ -868,7 +840,6 @@
         axisLine: { lineStyle: { color:'rgba(255,255,255,.14)' } },
         axisTick: { show: false }
       },
-
       visualMap: {
         type: 'continuous',
         min: -absMax,
@@ -877,7 +848,6 @@
         calculable: false,
         inRange: { color: ['#ff6b6b', '#141a2a', '#7aa2ff'] }
       },
-
       tooltip: {
         trigger: 'item',
         backgroundColor: 'rgba(10,14,26,.95)',
@@ -891,7 +861,6 @@
           return `${race}<br>${name}: <b>${sign}${fmtJPY(v)}円</b>`;
         }
       },
-
       series: [{
         type: 'custom',
         data,
@@ -987,6 +956,7 @@
     });
   }
 
+  // ★★★★★ ここが「並び順固定＆入れ替わり防止」の核心 ★★★★★
   async function renderDashboard() {
     dashCharts.forEach(c => safeDispose(c));
     dashCharts = [];
@@ -994,16 +964,32 @@
     const updated = document.getElementById("updatedDash");
     updated.textContent = "updated: loading...";
 
-    // ★表示直後のDOM確定待ち（初回描画失敗対策）
     await nextPaint();
 
     const data = await getAllDataFast();
-    const participants = data.summary.map(d => d.participant);
 
-    dashCharts.push(makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false));
-    dashCharts.push(makeBar("barProfit", "収支", participants, data.summary.map(d=>Number(d.profit_total??0)), false));
-    dashCharts.push(makeBar("barRoi", "回収率", participants, data.summary.map(d=>Number(d.roi??0)), true));
+    // ① GASのsummaryを Map 化（participant → データ）
+    const summaryMap = new Map(
+      (data.summary ?? []).map(d => [String(d.participant ?? "").trim(), d])
+    );
 
+    // ② 表示順は PARTICIPANTS の順で固定
+    const participants = PARTICIPANTS.slice();
+
+    // ③ participants と同じ順の「orderedSummary」を作る（←ズレ防止の決定打）
+    const orderedSummary = participants.map(p => summaryMap.get(p) ?? {
+      participant: p,
+      bet_total: 0,
+      profit_total: 0,
+      roi: 0
+    });
+
+    // ④ 棒グラフ：participants と orderedSummary の index が一致するので入れ替わらない
+    dashCharts.push(makeBar("barBet", "掛け金合計", participants, orderedSummary.map(d=>Number(d.bet_total??0)), false));
+    dashCharts.push(makeBar("barProfit", "収支", participants, orderedSummary.map(d=>Number(d.profit_total??0)), false));
+    dashCharts.push(makeBar("barRoi", "回収率", participants, orderedSummary.map(d=>Number(d.roi??0)), true));
+
+    // 折れ線はGAS側のseries順のまま（必要ならここも揃えられる）
     dashCharts.push(makeLines("lineCumBet", data.cumBet, false, false));
     dashCharts.push(makeLines("lineCumProfit", data.cumProfit, false, true));
     dashCharts.push(makeLines("lineCumRoi", data.cumRoi, true, false));
@@ -1017,7 +1003,6 @@
     const updated = document.getElementById("updatedTable");
     updated.textContent = "updated: loading...";
 
-    // ★表示直後のDOM確定待ち（初回描画失敗対策）
     await nextPaint();
 
     const data = await getAllDataFast();
@@ -1026,12 +1011,9 @@
       tableChartWrap = makeProfitTable();
     }
 
-    // ★init直後にresize（iPhoneで0幅判定になるのを防ぐ）
     tableChartWrap.chart.resize();
-
     tableChartWrap.set(data.profitTable);
 
-    // ★描画後もう一回resize（初回だけの保険）
     await nextPaint();
     tableChartWrap.chart.resize();
 
@@ -1074,7 +1056,6 @@
   const savedTab = localStorage.getItem("waku_g1_active_tab");
   if (savedTab === "dashboard" || savedTab === "table" || savedTab === "history") setTab(savedTab);
 
-  // ★初期表示のタブがdashboard/tableの場合、必ず初回描画する
   (async () => {
     try {
       if (savedTab === "dashboard") await renderDashboard();
@@ -1125,7 +1106,7 @@
     }
   });
 
-  // ========= 送信（トースト対応・二重送信防止） =========
+  // ========= 送信（トースト対応・二重送信防止・詳細表示） =========
   document.getElementById("entryForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
 
