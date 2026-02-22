@@ -630,9 +630,27 @@
       data:block.series[name],
       smooth:false,
       showSymbol:false,
-      lineStyle:{ width:2, color:getColor(name) },
+
+  // ★線の色
+      lineStyle:{
+        width:2,
+        color:getColor(name)
+      },
+
+  // ★点の色
+      itemStyle:{
+        color:getColor(name)
+      },
+
+  // ★凡例の色も統一
+      color:getColor(name),
+
       emphasis:{ focus:'series' }
     }));
+
+
+
+    
 
     const opt = {
       backgroundColor:'transparent',
