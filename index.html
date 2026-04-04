@@ -327,8 +327,8 @@
   const GAS_BASE = "https://script.google.com/macros/s/AKfycbw1jiY51U3elE5tyArrcmDH0nYKtJ3N4zrnHx6TNmzojIVOl4-njJaIC7WUlcgp32sbXA/exec";
 
   // ========= マスタ =========
-  // ★ここが表示順（たきざわを一番右にしたいなら最後）
-  const PARTICIPANTS = ["わくだ","きよもと","せきざわ","かば","たきざわ"];
+  // ★ここが表示順（やなぎを一番右にしたいなら最後）
+  const PARTICIPANTS = ["わくだ","きよもと","せきざわ","かば","やなぎ"];
 
   // 入力用（表示そのまま）
   const RACES = [
@@ -395,7 +395,7 @@
     "きよもと": "#ffd166",
     "せきざわ": "#ff6b6b",
     "かば": "#6ee7b7",
-    "たきざわ":     "#a78bfa",
+    "やなぎ":     "#a78bfa",
   };
   const getColor = (name) => COLOR_MAP[name] || "#7aa2ff";
 
@@ -986,7 +986,7 @@ async function renderDashboard() {
 
   const data = await getAllDataFast();
 
-  // ★表示順は固定（たきざわを一番右にしたいなら最後にしておく）
+  // ★表示順は固定（やなぎを一番右にしたいなら最後にしておく）
   const participants = PARTICIPANTS.slice();
 
   // ★累積ブロックから「最後の値」を取り出す
