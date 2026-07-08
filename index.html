@@ -177,11 +177,15 @@
     .chartTall{width:100%; height:360px;}
 
     /* 一覧表タブ */
+    /* ★ヒートマップの色をくっきり見せるため、周りのガラス調カードより一段暗い「ステージ」にする */
     .tableWrap{
       overflow-x:hidden; /* ★スマホでも横スクロールさせない（崩れない設計にする） */
       -webkit-overflow-scrolling:touch;
-      border-radius:12px;
+      border-radius:14px;
       width:100%;
+      background: rgba(4,7,16,.55);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+      padding:4px;
     }
     .chartTable{
       width:100%;
@@ -1019,6 +1023,7 @@
     return {
       people,
       raceLabels: TABLE_RACES,
+      kind: metricDef.kind,
       rawValues: values,
       colorValues,
       cellText: (v) => metricCellText(metricDef.kind, v),
@@ -1028,7 +1033,7 @@
 
   function buildHeatmapOption(cfg) {
     if (!cfg) return null;
-    const { people, raceLabels, rawValues, colorValues, cellText, tooltipText } = cfg;
+    const { people, raceLabels, rawValues, colorValues, cellText, tooltipText, kind } = cfg;
     if (people.length === 0 || raceLabels.length === 0) return null;
 
     let min = Infinity, max = -Infinity;
@@ -1047,8 +1052,23 @@
         data.push([x, y, cv, rv, isBlank ? 1 : 0]);
       }
     }
+    if (min === Infinity) { min = 0; max = 0; }
 
+    // ★掛け金・回収額など「0以上しかない」指標は±absMaxで中央揃えにすると
+    //   色が中央（暗色）付近に潰れて見えなくなる → 実際のmin〜maxをそのまま使う
+    const isMoneyKind = kind === "money";
     const absMax = Math.max(Math.abs(min), Math.abs(max)) || 1;
+    const visualMin = isMoneyKind ? Math.min(0, min) : -absMax;
+    const visualMax = isMoneyKind ? (max || 1) : absMax;
+    const heatColors = isMoneyKind
+      ? ['#0c1220', '#6f9bff']
+      : ['#ff5c72', '#0c1220', '#6f9bff'];
+    const colorSpan = (visualMax - visualMin) || 1;
+    // セル内テキストの色を決めるための「強さ」(0〜1)
+    const intensity = (cv) => isMoneyKind
+      ? (cv - visualMin) / colorSpan
+      : Math.abs(cv) / absMax;
+
     const mobile = isMobile();
 
     // ★iPhoneで横スクロールなしで「収める」前提のレイアウト
@@ -1102,11 +1122,12 @@
 
       visualMap: {
         type: 'continuous',
-        min: -absMax,
-        max: absMax,
+        dimension: 2, // ★data配列の3番目(colorV)を必ず色に使う（4,5番目を追加した際に暗黙のデフォルトがズレていた）
+        min: visualMin,
+        max: visualMax,
         show: false,
         calculable: false,
-        inRange: { color: ['#ff6b6b', '#141a2a', '#7aa2ff'] }
+        inRange: { color: heatColors }
       },
 
       tooltip: {
@@ -1169,7 +1190,7 @@
 
           const stroke = 'rgba(255,255,255,.10)';
           const lw = 1;
-          const txt = Math.abs(colorV) > absMax * 0.55 ? 'rgba(255,255,255,.92)' : 'rgba(233,238,252,.90)';
+          const txt = intensity(colorV) > 0.55 ? 'rgba(255,255,255,.92)' : 'rgba(233,238,252,.90)';
 
           return {
             type: 'group',
