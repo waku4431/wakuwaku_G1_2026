@@ -618,46 +618,40 @@
     el._hideTimer = setTimeout(() => { el.style.opacity = "0"; }, 2400);
   }
 
-  // ========= 先読みキャッシュ =========
-  let cachedAllData = null;
-  let cachedAllDataAt = 0;
+  // ========= 先読みキャッシュ（Entries生データを唯一の情報源にする） =========
+  // ★ダッシュボードの数値が個人成績/一覧表とズレていた原因はGASのWebDataシート（集計式）が
+  //   Entriesと食い違っていたこと。ダッシュボードも含め全画面をEntries由来の計算に統一する。
+  let cachedEntries = null;
+  let cachedEntriesAt = 0;
   let prefetchPromise = null;
   const CACHE_MS = 30 * 1000;
 
-  async function loadData() {
-    const url = `${GAS_BASE}?type=all&t=${Date.now()}`;
-    const res = await fetch(url, { method:"GET" });
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || "GAS ok=false");
-    return json;
-  }
-
-  async function getAllDataFast() {
+  async function getEntriesFast() {
     const now = Date.now();
-    if (cachedAllData && (now - cachedAllDataAt) < CACHE_MS) return cachedAllData;
+    if (cachedEntries && (now - cachedEntriesAt) < CACHE_MS) return cachedEntries;
 
     if (prefetchPromise) {
       const data = await prefetchPromise;
-      cachedAllData = data;
-      cachedAllDataAt = Date.now();
+      cachedEntries = data;
+      cachedEntriesAt = Date.now();
       prefetchPromise = null;
       return data;
     }
 
-    prefetchPromise = loadData();
+    prefetchPromise = loadEntries();
     const data = await prefetchPromise;
-    cachedAllData = data;
-    cachedAllDataAt = Date.now();
+    cachedEntries = data;
+    cachedEntriesAt = Date.now();
     prefetchPromise = null;
     return data;
   }
 
-  function prefetchAllData() {
-    if (!prefetchPromise && (!cachedAllData || (Date.now() - cachedAllDataAt) > CACHE_MS)) {
-      prefetchPromise = loadData()
+  function prefetchEntries() {
+    if (!prefetchPromise && (!cachedEntries || (Date.now() - cachedEntriesAt) > CACHE_MS)) {
+      prefetchPromise = loadEntries()
         .then(d => {
-          cachedAllData = d;
-          cachedAllDataAt = Date.now();
+          cachedEntries = d;
+          cachedEntriesAt = Date.now();
           return d;
         })
         .finally(() => { prefetchPromise = null; });
@@ -707,7 +701,7 @@
     localStorage.setItem("waku_g1_active_tab", tabName);
 
     // 入力以外に行ったら先読み
-    if (tabName !== "dashboard" && tabName !== "table") prefetchAllData();
+    if (tabName !== "dashboard" && tabName !== "table") prefetchEntries();
   }
 
   // ========= Entries POST（追加/更新/削除） =========
@@ -1013,6 +1007,36 @@
     return matrix;
   }
 
+  // ダッシュボードの合計棒グラフ用：各参加者の最終（＝一番最後に開催済みだった行の）累積値を集計から取り出す
+  function computeSummaryFromMatrix(matrix, people) {
+    return people.map((name, j) => {
+      let bet_total = 0, payout_total = 0;
+      for (let y = 0; y < matrix.cumBet.length; y++) {
+        if (matrix.cumBet[y][j] === null) break; // 未開催以降は打ち切り
+        bet_total = matrix.cumBet[y][j];
+        payout_total = matrix.cumPay[y][j];
+      }
+      const profit_total = payout_total - bet_total;
+      const roi = bet_total > 0 ? (payout_total / bet_total * 100) : 0;
+      return { participant: name, bet_total, payout_total, profit_total, roi };
+    });
+  }
+
+  // ダッシュボードの累積折れ線グラフ用：{dates:[...], series:{name:[...]}} を作る（未開催レースは含めない）
+  function computeCumSeriesFromMatrix(matrix, people, key) {
+    const dates = [];
+    const series = {};
+    people.forEach(name => series[name] = []);
+
+    for (let y = 0; y < RACES.length; y++) {
+      if (matrix[key][y].some(v => v === null)) break; // 未開催レース以降で打ち切り
+      dates.push(extractRaceDateLabel(RACES[y]));
+      people.forEach((name, j) => series[name].push(matrix[key][y][j]));
+    }
+
+    return { dates, series };
+  }
+
   // 指定指標のヒートマップ設定を作る（列=peopleの並びはダッシュボードと揃え、クリック時のインデックス対応を保証する）
   function buildHeatmapConfigForMetric(allMetrics, metricDef, people) {
     const values = allMetrics[metricDef.key];
@@ -1241,8 +1265,7 @@
     chart.on('click', (params) => {
       if (!params?.data) return;
       const x = params.data[0], y = params.data[1];
-      const people = lastTableData?.summary.map(d => d.participant) || [];
-      const name = people[x];
+      const name = PARTICIPANTS[x];
       const race = RACES[y];
       if (name && race) goToInput(name, race);
     });
@@ -1290,22 +1313,6 @@
     });
   }
 
-  // {dates:[...], series:{name:[...]}} を今日以前の日付だけに切り詰める
-  function filterTimeSeriesUpToToday(block) {
-    const dates = block?.dates ?? [];
-    let endIdx = dates.length;
-    for (let i = 0; i < dates.length; i++) {
-      if (!isDateLabelOnOrBeforeToday(dates[i])) { endIdx = i; break; }
-    }
-
-    const filteredSeries = {};
-    Object.keys(block?.series ?? {}).forEach(name => {
-      filteredSeries[name] = (block.series[name] ?? []).slice(0, endIdx);
-    });
-
-    return { dates: dates.slice(0, endIdx), series: filteredSeries };
-  }
-
   async function renderDashboard() {
     const updated = document.getElementById("updatedDash");
     updated.textContent = "updated: loading...";
@@ -1313,19 +1320,22 @@
     // ★表示直後のDOM確定待ち（初回描画失敗対策）
     await nextPaint();
 
-    const data = await getAllDataFast();
-    const participants = data.summary.map(d => d.participant);
+    // ★Entries生データだけを唯一の情報源にする（個人成績/一覧表と必ず一致させる）
+    const entries = await getEntriesFast();
+    const participants = PARTICIPANTS;
+    const matrix = buildAllMetricsMatrix(entries, participants);
+    const summary = computeSummaryFromMatrix(matrix, participants);
 
     renderDashProfileLinks(participants);
 
-    makeBar("barBet", "掛け金合計", participants, data.summary.map(d=>Number(d.bet_total??0)), false);
-    makeBar("barProfit", "収支", participants, data.summary.map(d=>Number(d.profit_total??0)), false);
-    makeBar("barRoi", "回収率", participants, data.summary.map(d=>Number(d.roi??0)), true);
+    makeBar("barBet", "掛け金合計", participants, summary.map(d=>d.bet_total), false);
+    makeBar("barProfit", "収支", participants, summary.map(d=>d.profit_total), false);
+    makeBar("barRoi", "回収率", participants, summary.map(d=>d.roi), true);
 
     // ★横軸（レース回数）は今日までに留める。未開催レースの空データ点は表示しない
-    makeLines("lineCumBet", filterTimeSeriesUpToToday(data.cumBet), false, false);
-    makeLines("lineCumProfit", filterTimeSeriesUpToToday(data.cumProfit), false, true);
-    makeLines("lineCumRoi", filterTimeSeriesUpToToday(data.cumRoi), true, false);
+    makeLines("lineCumBet", computeCumSeriesFromMatrix(matrix, participants, "cumBet"), false, false);
+    makeLines("lineCumProfit", computeCumSeriesFromMatrix(matrix, participants, "cumProfit"), false, true);
+    makeLines("lineCumRoi", computeCumSeriesFromMatrix(matrix, participants, "cumRoi"), true, false);
 
     // ★タブ再表示直後に0幅判定になるのを防ぐ
     Object.values(dashChartInstances).forEach(c => c?.resize?.());
@@ -1337,7 +1347,6 @@
 
   // ========= 一覧表：指標の切替 =========
   let heatmapMetricKey = "profit";
-  let lastTableData = null;
   let lastMetricsMatrix = null;
 
   function renderHeatmapModeChips() {
@@ -1360,10 +1369,9 @@
   }
 
   function renderHeatmapForMode() {
-    if (!lastTableData || !lastMetricsMatrix || !tableChartWrap) return;
-    const people = lastTableData.summary.map(d => d.participant);
+    if (!lastMetricsMatrix || !tableChartWrap) return;
     const metricDef = HEATMAP_METRICS.find(m => m.key === heatmapMetricKey);
-    const cfg = buildHeatmapConfigForMetric(lastMetricsMatrix, metricDef, people);
+    const cfg = buildHeatmapConfigForMetric(lastMetricsMatrix, metricDef, PARTICIPANTS);
     tableChartWrap.set(cfg);
   }
 
@@ -1374,11 +1382,9 @@
     // ★表示直後のDOM確定待ち（初回描画失敗対策）
     await nextPaint();
 
-    const [data, entries] = await Promise.all([getAllDataFast(), loadEntries()]);
-    lastTableData = data;
-
-    const people = data.summary.map(d => d.participant);
-    lastMetricsMatrix = buildAllMetricsMatrix(entries, people);
+    // ★Entries生データだけを唯一の情報源にする（個人成績/ダッシュボードと必ず一致させる）
+    const entries = await getEntriesFast();
+    lastMetricsMatrix = buildAllMetricsMatrix(entries, PARTICIPANTS);
 
     if (!tableChartWrap) {
       tableChartWrap = makeHeatmapChart();
@@ -1546,7 +1552,7 @@
 
         await updateEntry({ row: rowData.row, name: participantName, race: rowData.race, bet: newBet, pay: newPay });
 
-        cachedAllDataAt = 0; // ダッシュボード/収支表を次回再取得させる
+        cachedEntriesAt = 0; // ダッシュボード/収支表を次回再取得させる
         toast("更新しました");
         await renderProfile(); // 累積値を含めて再計算
       } catch (e) {
@@ -1590,7 +1596,7 @@
 
     renderParticipantChips(chipWrap, name, applyName);
 
-    cachedProfileEntries = await loadEntries();
+    cachedProfileEntries = await getEntriesFast();
     applyName(name);
 
     updated.textContent = "updated: " + new Date().toLocaleString("ja-JP");
@@ -1699,7 +1705,7 @@
 
           await updateEntry({ row: entry.row, name: newName, race: newRace, bet: newBet, pay: newPay });
 
-          cachedAllDataAt = 0; // ダッシュボード/収支表を次回再取得させる
+          cachedEntriesAt = 0; // ダッシュボード/収支表を次回再取得させる
           toast("更新しました");
           await renderEdit();
         } catch (e) {
@@ -1716,7 +1722,7 @@
       btn.disabled = true;
       try {
         await deleteEntry(entry.row);
-        cachedAllDataAt = 0;
+        cachedEntriesAt = 0;
         toast("削除しました");
         await renderEdit();
       } catch (e) {
@@ -1767,7 +1773,7 @@
   });
 
   loadFormState();
-  setTimeout(prefetchAllData, 0);
+  setTimeout(prefetchEntries, 0);
 
   const savedTab = localStorage.getItem("waku_g1_active_tab");
   if (TAB_NAMES.includes(savedTab) && savedTab !== "input") setTab(savedTab);
@@ -1813,7 +1819,7 @@
 
   document.getElementById("reloadDashBtn").addEventListener("click", async () => {
     try {
-      cachedAllDataAt = 0;
+      cachedEntriesAt = 0;
       await renderDashboard();
     } catch (e) {
       toast("再読み込みエラー: " + e.message, true);
@@ -1822,7 +1828,7 @@
 
   document.getElementById("reloadTableBtn").addEventListener("click", async () => {
     try {
-      cachedAllDataAt = 0;
+      cachedEntriesAt = 0;
       await renderTable();
     } catch (e) {
       toast("再読み込みエラー: " + e.message, true);
@@ -1866,8 +1872,8 @@
       }
 
       saveFormState();
-      cachedAllDataAt = 0; // ダッシュボード/収支表/個人成績を次回再取得させる
-      prefetchAllData();
+      cachedEntriesAt = 0; // ダッシュボード/収支表/個人成績を次回再取得させる
+      prefetchEntries();
       toast(`送信しました：${name} / ${race}`);
 
     } catch (e) {
